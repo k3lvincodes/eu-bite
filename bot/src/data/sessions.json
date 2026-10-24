@@ -1,0 +1,227 @@
+[
+  {
+    "phone": "6034402283",
+    "channel": "telegram",
+    "step": "VIEWING_CART",
+    "cart": [
+      {
+        "itemId": "44444444-4444-4444-4444-444444444404",
+        "name": "Chilled Hibiscus Zobo (500ml)",
+        "priceKobo": 50000,
+        "quantity": 2,
+        "restaurantId": "33333333-3333-3333-3333-333333333301",
+        "restaurantName": "Campus Bites & Grill",
+        "note": "add_more"
+      },
+      {
+        "itemId": "44444444-4444-4444-4444-444444444403",
+        "name": "Double Sausage Beef Shawarma",
+        "priceKobo": 180000,
+        "quantity": 1,
+        "restaurantId": "33333333-3333-3333-3333-333333333301",
+        "restaurantName": "Campus Bites & Grill"
+      }
+    ],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1791838308306,
+    "selectedRestaurantId": "33333333-3333-3333-3333-333333333301",
+    "selectedRestaurantName": "Campus Bites & Grill",
+    "lastAddedItemId": "44444444-4444-4444-4444-444444444403",
+    "hostel": "Postgraduate Hall",
+    "menuPage": 1
+  },
+  {
+    "phone": "+2348099887711",
+    "channel": "whatsapp",
+    "step": "AWAITING_PAYMENT",
+    "cart": [],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1792863756601,
+    "isRegistered": true,
+    "studentName": "Amina Danjuma",
+    "hostel": "Hostel Block C",
+    "room": "Room 214",
+    "selectedRestaurantId": "33333333-3333-3333-3333-333333333301",
+    "selectedRestaurantName": "Campus Bites & Grill",
+    "menuPage": 1,
+    "lastAddedItemId": "44444444-4444-4444-4444-444444444401",
+    "dropPreference": "gate",
+    "pendingOrder": {
+      "orderNumber": "EUB-202610-3546",
+      "restaurantName": "Campus Bites & Grill",
+      "totalNgn": 2870,
+      "checkoutUrl": "http://localhost:3000/checkout/pay?tx_ref=EUB-WA-EUB-202610-3546-1792863756594&amount=2870&order=EUB-202610-3546",
+      "deliveryPin": "7381",
+      "items": [
+        {
+          "itemId": "44444444-4444-4444-4444-444444444401",
+          "name": "Party Jollof Rice & Crispy Chicken",
+          "priceKobo": 220000,
+          "quantity": 1,
+          "restaurantId": "33333333-3333-3333-3333-333333333301",
+          "restaurantName": "Campus Bites & Grill"
+        }
+      ],
+      "hostel": "Hostel Block C",
+      "room": "Room 214",
+      "dropPreference": "Porter's Lodge / Gate",
+      "packagingCount": 1,
+      "createdAt": 1792863756597
+    }
+  },
+  {
+    "phone": "tg_9821441",
+    "channel": "telegram",
+    "step": "AWAITING_PAYMENT",
+    "cart": [],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1792863756695,
+    "isRegistered": true,
+    "studentName": "Emeka Obi",
+    "hostel": "Hostel Block A",
+    "room": "Room 102",
+    "selectedRestaurantId": "33333333-3333-3333-3333-333333333301",
+    "selectedRestaurantName": "Campus Bites & Grill",
+    "menuPage": 1,
+    "lastAddedItemId": "44444444-4444-4444-4444-444444444401",
+    "dropPreference": "room",
+    "pendingOrder": {
+      "orderNumber": "EUB-202610-3640",
+      "restaurantName": "Campus Bites & Grill",
+      "totalNgn": 2870,
+      "checkoutUrl": "http://localhost:3000/checkout/pay?tx_ref=EUB-WA-EUB-202610-3640-1792863756689&amount=2870&order=EUB-202610-3640",
+      "deliveryPin": "8410",
+      "items": [
+        {
+          "itemId": "44444444-4444-4444-4444-444444444401",
+          "name": "Party Jollof Rice & Crispy Chicken",
+          "priceKobo": 220000,
+          "quantity": 1,
+          "restaurantId": "33333333-3333-3333-3333-333333333301",
+          "restaurantName": "Campus Bites & Grill"
+        }
+      ],
+      "hostel": "Hostel Block A",
+      "room": "Room 102",
+      "dropPreference": "Room Door",
+      "packagingCount": 1,
+      "createdAt": 1792863756691
+    }
+  },
+  {
+    "phone": "8403867727",
+    "channel": "telegram",
+    "step": "ONBOARDING_NAME",
+    "cart": [],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1791837018819
+  },
+  {
+    "phone": "5046181533",
+    "channel": "telegram",
+    "step": "AWAITING_PAYMENT",
+    "cart": [],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1791837863467,
+    "studentName": "Patrick Ifeanyichukwu",
+    "realPhone": "+2349077428155",
+    "hostel": "Postgraduate Hall",
+    "room": "Room B12",
+    "isRegistered": true,
+    "selectedRestaurantId": "33333333-3333-3333-3333-333333333301",
+    "selectedRestaurantName": "Campus Bites & Grill",
+    "menuPage": 1,
+    "lastAddedItemId": "44444444-4444-4444-4444-444444444402",
+    "dropPreference": "gate",
+    "pendingOrder": {
+      "orderNumber": "EUB-202610-6831",
+      "restaurantName": "Campus Bites & Grill & Mama T’s Bukka Delight",
+      "totalNgn": 15120,
+      "checkoutUrl": "http://localhost:3000/checkout/pay?tx_ref=EUB-TG-EUB-202610-6831-1791837863467&amount=15120&order=EUB-202610-6831",
+      "deliveryPin": "7069",
+      "items": [
+        {
+          "itemId": "44444444-4444-4444-4444-444444444401",
+          "name": "Party Jollof Rice & Crispy Chicken",
+          "priceKobo": 220000,
+          "quantity": 3,
+          "restaurantId": "33333333-3333-3333-3333-333333333301",
+          "restaurantName": "Campus Bites & Grill"
+        },
+        {
+          "itemId": "44444444-4444-4444-4444-444444444406",
+          "name": "Ofada Rice & Spicy Ayamase Sauce",
+          "priceKobo": 230000,
+          "quantity": 2,
+          "restaurantId": "33333333-3333-3333-3333-333333333302",
+          "restaurantName": "Mama T’s Bukka Delight"
+        },
+        {
+          "itemId": "44444444-4444-4444-4444-444444444402",
+          "name": "Special Fried Rice & Peppered Turkey",
+          "priceKobo": 260000,
+          "quantity": 1,
+          "restaurantId": "33333333-3333-3333-3333-333333333301",
+          "restaurantName": "Campus Bites & Grill"
+        }
+      ],
+      "hostel": "Postgraduate Hall",
+      "room": "Room B12",
+      "dropPreference": "Porter's Lodge / Gate",
+      "packagingCount": 6,
+      "createdAt": 1791837863467
+    }
+  },
+  {
+    "phone": "+2348066778899",
+    "channel": "whatsapp",
+    "step": "MAIN_MENU",
+    "cart": [],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1791837946924
+  },
+  {
+    "phone": "tg_multi_vendor_99",
+    "channel": "telegram",
+    "step": "BROWSING_ITEMS",
+    "cart": [
+      {
+        "itemId": "44444444-4444-4444-4444-444444444401",
+        "name": "Party Jollof Rice & Crispy Chicken",
+        "priceKobo": 220000,
+        "quantity": 1,
+        "restaurantId": "33333333-3333-3333-3333-333333333301",
+        "restaurantName": "Campus Bites & Grill",
+        "note": "No pepper and extra sauce"
+      },
+      {
+        "itemId": "44444444-4444-4444-4444-444444444405",
+        "name": "Pounded Yam & Assorted Egusi Soup",
+        "priceKobo": 240000,
+        "quantity": 2,
+        "restaurantId": "33333333-3333-3333-3333-333333333302",
+        "restaurantName": "Mama T’s Bukka Delight"
+      },
+      {
+        "itemId": "44444444-4444-4444-4444-444444444409",
+        "name": "Sweet Fried Plantain (Dodo Portion)",
+        "priceKobo": 70000,
+        "quantity": 1,
+        "restaurantId": "33333333-3333-3333-3333-333333333301",
+        "restaurantName": "Campus Bites & Grill"
+      }
+    ],
+    "selectedPackaging": "reusable",
+    "lastActivity": 1792863756922,
+    "studentName": "Zainab Ahmed",
+    "realPhone": "+2348099887766",
+    "hostel": "Hostel Block B",
+    "room": "Room 114",
+    "isRegistered": true,
+    "selectedRestaurantId": "33333333-3333-3333-3333-333333333301",
+    "selectedRestaurantName": "Campus Bites & Grill",
+    "menuPage": 1,
+    "lastAddedItemId": "44444444-4444-4444-4444-444444444409",
+    "dropPreference": "gate"
+  }
+]

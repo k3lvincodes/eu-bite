@@ -1,0 +1,70 @@
+services:
+  # ==========================================================
+  # 1. EU Bite Central API Server
+  # ==========================================================
+  - type: web
+    name: eu-bite-server
+    runtime: node
+    plan: free
+    region: frankfurt # Low-latency for Nigeria / EMEA
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BOT_SERVICE_TOKEN
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # Set in Render Dashboard: Supabase pooled connection string
+      - key: FLUTTERWAVE_SECRET_KEY
+        sync: false
+      - key: FLUTTERWAVE_SECRET_HASH
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"
+
+  # ==========================================================
+  # 2. EU Bite Omnichannel Bot Service (WhatsApp & Telegram)
+  # ==========================================================
+  - type: web
+    name: eu-bite-bot
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: bot
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CENTRAL_SERVER_URL
+        fromService:
+          type: web
+          name: eu-bite-server
+          property: host
+      - key: BOT_SERVICE_TOKEN
+        fromService:
+          type: web
+          name: eu-bite-server
+          envVarKey: BOT_SERVICE_TOKEN
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_SECRET_TOKEN
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false

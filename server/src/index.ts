@@ -13,10 +13,20 @@ import { checkDbHealth } from './db/index.ts';
 const app = createExpressApp();
 const PORT = process.env.PORT || 4000;
 
+const rawBotUrl = process.env.BOT_SERVICE_URL || process.env.BOT_WEBHOOK_URL || '';
+const botBaseUrl = rawBotUrl.replace(/\/webhook.*$/, '').replace(/\/$/, '');
+
 // Comprehensive Health Check Endpoint for Render & Uptime Monitors (UptimeRobot / BetterStack)
 const healthHandler = async (req: any, res: any) => {
   const dbHealth = await checkDbHealth();
   const memory = process.memoryUsage();
+
+  // Forward keep-alive ping to Bot service so it never sleeps
+  let botPingStatus = 'not_configured';
+  if (botBaseUrl) {
+    fetch(`${botBaseUrl}/health`, { signal: AbortSignal.timeout(3000) }).catch(() => {});
+    botPingStatus = 'keep_alive_forwarded';
+  }
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.json({
@@ -26,6 +36,7 @@ const healthHandler = async (req: any, res: any) => {
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     db: dbHealth,
+    botKeepAlive: botPingStatus,
     memory: {
       rssMb: Math.round(memory.rss / (1024 * 1024)),
       heapUsedMb: Math.round(memory.heapUsed / (1024 * 1024)),
@@ -52,6 +63,12 @@ if (isMain && process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`🚀 EU Bite Central API running on http://localhost:${PORT}`);
     console.log(`🔒 WhatsApp Bot Bridge enabled on /api/bot-bridge`);
+    if (botBaseUrl) {
+      console.log(`📡 Bot Keep-Alive bridge enabled -> ${botBaseUrl}/health`);
+      setInterval(() => {
+        fetch(`${botBaseUrl}/health`, { signal: AbortSignal.timeout(5000) }).catch(() => {});
+      }, 10 * 60 * 1000);
+    }
   });
 }
 

@@ -267,7 +267,7 @@ describe('EU Bite Central API Acceptance Tests', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-bot-service-token': 'eu_bite_internal_bot_api_token_shared_secret',
+        'x-bot-service-token': process.env.BOT_SERVICE_TOKEN || 'eu_bite_internal_bot_api_token_shared_secret',
       },
       body: JSON.stringify({
         phone: '+2348099887766',

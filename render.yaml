@@ -29,6 +29,11 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: "*"
+      - key: BOT_SERVICE_URL
+        fromService:
+          type: web
+          name: eu-bite-bot
+          property: host
 
   # ==========================================================
   # 2. EU Bite Omnichannel Bot Service (WhatsApp & Telegram)

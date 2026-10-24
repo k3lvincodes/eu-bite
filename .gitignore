@@ -52,3 +52,9 @@ Desktop.ini
 
 # Agent / Tooling Caches
 .gemini/
+
+# Private Documentation & Local Development Notes
+docs/
+docs.md
+docs.txt
+*.local.md

@@ -828,6 +828,7 @@ export class BotEngine {
       const existing = session.cart.find((c) => c.itemId === item.id);
       if (existing) {
         existing.quantity += qty;
+        existing.addedAt = Date.now();
       } else {
         session.cart.push({
           itemId: item.id,
@@ -836,6 +837,7 @@ export class BotEngine {
           quantity: qty,
           restaurantId: restaurant.id,
           restaurantName: restaurant.name,
+          addedAt: Date.now(),
         });
       }
 
@@ -904,6 +906,8 @@ export class BotEngine {
   // ==========================================
 
   private static async displayCart(session: UserSession): Promise<string> {
+    sessionManager.purgeExpiredCartItems(session);
+
     if (session.cart.length === 0) {
       const emptyMsg =
         '*Your tray is currently empty.*\n\n' +
@@ -1459,7 +1463,7 @@ export class BotEngine {
    */
   private static async restoreCartForModification(session: UserSession): Promise<string> {
     if (session.pendingOrder && session.pendingOrder.items.length > 0) {
-      session.cart = [...session.pendingOrder.items];
+      session.cart = session.pendingOrder.items.map((i) => ({ ...i, addedAt: Date.now() }));
       session.pendingOrder = undefined;
       session.step = 'VIEWING_CART';
       sessionManager.saveSession(session);

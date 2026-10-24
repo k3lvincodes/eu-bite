@@ -342,6 +342,27 @@ describe('EU Bite Omnichannel Bot Conversational Flow Tests (WhatsApp & Telegram
       assert.strictEqual(sessionManager.getSession(multiUser).step, 'BROWSING_ITEMS');
       assert.strictEqual(sessionManager.getSession(multiUser).menuPage, 1);
     });
+
+    test('9. Tray items automatically expire and disappear after 1 hour', async () => {
+      const s = sessionManager.getSession(multiUser);
+      assert.ok(s.cart.length > 0, 'Cart should have items');
+
+      // Age all items in cart to be older than 1 hour (3600 seconds)
+      const oneHourAndFiveMinutesAgo = Date.now() - (65 * 60 * 1000);
+      for (const item of s.cart) {
+        item.addedAt = oneHourAndFiveMinutesAgo;
+      }
+      s.lastActivity = oneHourAndFiveMinutesAgo;
+      sessionManager.saveSession(s);
+
+      // Inspect cart via BotEngine
+      const cartRes = await BotEngine.handleIncomingMessage(multiUser, 'cart', 'telegram');
+      assert.strictEqual(cartRes, 'Cart is empty');
+
+      // Verify the session's cart has zero items
+      const updatedSession = sessionManager.getSession(multiUser);
+      assert.strictEqual(updatedSession.cart.length, 0);
+    });
   });
 });
 

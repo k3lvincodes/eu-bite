@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+export const CART_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+
 export interface CartItem {
   itemId: string;
   name: string;
@@ -9,6 +11,7 @@ export interface CartItem {
   restaurantId: string;
   restaurantName: string;
   note?: string;
+  addedAt?: number;
 }
 
 export type ConversationStep =
@@ -81,6 +84,36 @@ class SessionManager {
 
   constructor() {
     this.loadSessionsFromDisk();
+    if (typeof setInterval !== 'undefined') {
+      const timer = setInterval(() => {
+        let changed = false;
+        for (const s of this.sessions.values()) {
+          if (this.purgeExpiredCartItems(s)) {
+            changed = true;
+          }
+        }
+        if (changed) {
+          this.persistSessionsToDisk();
+        }
+      }, 5 * 60 * 1000);
+      if (timer && typeof timer.unref === 'function') {
+        timer.unref();
+      }
+    }
+  }
+
+  /**
+   * Purges cart items that have exceeded CART_EXPIRY_MS (1 hour)
+   */
+  purgeExpiredCartItems(session: UserSession): boolean {
+    if (!session.cart || session.cart.length === 0) return false;
+    const now = Date.now();
+    const originalLen = session.cart.length;
+    session.cart = session.cart.filter((item) => {
+      const itemTime = item.addedAt || session.lastActivity || now;
+      return now - itemTime < CART_EXPIRY_MS;
+    });
+    return session.cart.length !== originalLen;
   }
 
   private loadSessionsFromDisk(): void {
@@ -119,6 +152,7 @@ class SessionManager {
     const now = Date.now();
 
     if (existing) {
+      this.purgeExpiredCartItems(existing);
       existing.lastActivity = now;
       if (channel) {
         existing.channel = channel;
@@ -135,6 +169,7 @@ class SessionManager {
     }
 
     if (existing) {
+      this.purgeExpiredCartItems(existing);
       existing.lastActivity = now;
       if (channel) existing.channel = channel;
       return existing;
@@ -154,6 +189,7 @@ class SessionManager {
   }
 
   saveSession(session: UserSession): void {
+    this.purgeExpiredCartItems(session);
     session.lastActivity = Date.now();
     this.sessions.set(session.phone, session);
     this.persistSessionsToDisk();
@@ -167,6 +203,7 @@ class SessionManager {
   findSessionByPhone(phone: string): UserSession | undefined {
     for (const s of this.sessions.values()) {
       if (s.phone === phone || s.realPhone === phone) {
+        this.purgeExpiredCartItems(s);
         return s;
       }
     }

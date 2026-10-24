@@ -49,10 +49,18 @@ export class MiniApp extends MiniRouter {
       };
       res.json = (data: any) => {
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(data));
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(JSON.stringify(data));
+        }
       };
       res.send = (body: any) => {
-        res.end(body);
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(body);
+        }
       };
 
       const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -79,7 +87,8 @@ export class MiniApp extends MiniRouter {
         if (req.path.startsWith(mount.prefix)) {
           for (const r of mount.router.routes) {
             const fullPath = `${mount.prefix}${r.path}`.replace(/\/+/g, '/');
-            if (r.method === req.method && fullPath === req.path) {
+            const matches = r.method === req.method || (r.method === 'GET' && req.method === 'HEAD');
+            if (matches && fullPath === req.path) {
               matchedHandler = { handlers: [...mount.router.middlewares, ...r.handlers], params: {} };
               break;
             }
@@ -90,7 +99,8 @@ export class MiniApp extends MiniRouter {
 
       if (!matchedHandler) {
         for (const r of this.routes) {
-          if (r.method === req.method && r.path === req.path) {
+          const matches = r.method === req.method || (r.method === 'GET' && req.method === 'HEAD');
+          if (matches && r.path === req.path) {
             matchedHandler = { handlers: r.handlers, params: {} };
             break;
           }

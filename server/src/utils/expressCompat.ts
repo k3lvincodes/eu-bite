@@ -65,10 +65,18 @@ export class MiniApp extends MiniRouter {
       };
       res.json = (data: any) => {
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(data));
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(JSON.stringify(data));
+        }
       };
       res.send = (body: any) => {
-        res.end(body);
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(body);
+        }
       };
 
       // Enhance req
@@ -95,7 +103,11 @@ export class MiniApp extends MiniRouter {
       let matchedHandler: { handlers: MiddlewareHandler[]; params: Record<string, string> } | null = null;
 
       const testRoute = (route: RouteHandler, prefix: string = '') => {
-        if (route.method !== req.method && route.method !== 'ALL') return null;
+        const methodMatches =
+          route.method === req.method ||
+          route.method === 'ALL' ||
+          (route.method === 'GET' && req.method === 'HEAD');
+        if (!methodMatches) return null;
         const fullPath = `${prefix}${route.path}`.replace(/\/+/g, '/');
         const routeParts = fullPath.split('/').filter(Boolean);
         const reqParts = req.path.split('/').filter(Boolean);

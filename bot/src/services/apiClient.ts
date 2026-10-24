@@ -134,7 +134,8 @@ export class CentralApiClient {
       const restName = restaurantNames.size > 0 ? Array.from(restaurantNames).join(' & ') : 'Campus Dining';
       const total = subtotal + packagingFee + deliveryFee + serviceFee;
       const txRef = `EUB-TG-${orderNumber}-${Date.now()}`;
-      const checkoutUrl = `http://localhost:3000/checkout/pay?tx_ref=${txRef}&amount=${total}&order=${orderNumber}`;
+      const frontendBase = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://eu-bite.onrender.com');
+      const checkoutUrl = `${frontendBase}/checkout/pay?tx_ref=${txRef}&amount=${total}&order=${orderNumber}`;
 
       const orderData = {
         order_number: orderNumber,

@@ -25,7 +25,7 @@ export class ChannelService {
   static async sendQuickReplyButtons(
     session: UserSession,
     bodyText: string,
-    buttons: Array<{ id: string; title: string }>
+    buttons: Array<InteractiveOption>
   ): Promise<boolean> {
     if (session.channel === 'telegram') {
       // Create inline buttons: grid of 2 per row if more than 2 buttons
@@ -47,5 +47,21 @@ export class ChannelService {
     }
 
     return WhatsAppCloudApi.sendQuickReplyButtons(session.phone, bodyText, buttons);
+  }
+
+  /**
+   * Dispatches an interactive list on WhatsApp, or inline keyboard on Telegram
+   */
+  static async sendInteractiveList(
+    session: UserSession,
+    bodyText: string,
+    buttonLabel: string,
+    options: Array<InteractiveOption>,
+    headerText?: string
+  ): Promise<boolean> {
+    if (session.channel === 'telegram') {
+      return this.sendQuickReplyButtons(session, bodyText, options);
+    }
+    return WhatsAppCloudApi.sendInteractiveList(session.phone, bodyText, buttonLabel, options, headerText);
   }
 }

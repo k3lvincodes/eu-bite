@@ -197,6 +197,11 @@ describe('EU Bite Omnichannel Bot Conversational Flow Tests (WhatsApp & Telegram
       const trackResult = await BotEngine.handleIncomingMessage(testTelegramChatId, '/track', 'telegram');
       assert.strictEqual(trackResult, 'Order tracked');
     });
+
+    test('8. Quick PIN lookup with /pin command', async () => {
+      const pinResult = await BotEngine.handleIncomingMessage(testTelegramChatId, '/pin', 'telegram');
+      assert.ok(['PIN locked', 'PIN retrieved', 'No active PIN'].includes(pinResult));
+    });
   });
 
   // --- Multi-Restaurant & Advanced UX Flow Tests ---

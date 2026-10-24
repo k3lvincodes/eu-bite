@@ -2,6 +2,7 @@ import { sessionManager } from './conversationState.ts';
 import type { UserSession, CartItem } from './conversationState.ts';
 import { CentralApiClient } from './apiClient.ts';
 import { ChannelService } from './channelService.ts';
+import type { InteractiveOption } from './channelService.ts';
 
 const CAMPUS_HOSTELS = [
   'Hostel Block A',
@@ -57,6 +58,10 @@ export class BotEngine {
 
     if (lower === '/track' || lower === 'track') {
       return this.handleTrackOrder(session);
+    }
+
+    if (lower === '/pin' || lower === 'pin' || lower === 'my pin' || lower === 'delivery pin') {
+      return this.handleQuickPinLookup(session);
     }
 
     if (lower === '/profile' || lower === 'profile' || lower === 'my profile') {
@@ -137,7 +142,7 @@ export class BotEngine {
       case 'PROFILE_EDIT_NAME':
         session.studentName = cleanText;
         sessionManager.saveSession(session);
-        await ChannelService.sendMessage(session, `✅ Name updated to *${session.studentName}*.`);
+        await ChannelService.sendMessage(session, `Name updated to *${session.studentName}*.`);
         return this.displayProfile(session);
 
       case 'PROFILE_EDIT_PHONE':
@@ -149,7 +154,7 @@ export class BotEngine {
       case 'PROFILE_EDIT_ROOM':
         session.room = cleanText.startsWith('Room') ? cleanText : `Room ${cleanText.replace(/room/i, '').trim()}`;
         sessionManager.saveSession(session);
-        await ChannelService.sendMessage(session, `✅ Room updated to *${session.room}*.`);
+        await ChannelService.sendMessage(session, `Room updated to *${session.room}*.`);
         return this.displayProfile(session);
 
       case 'AWAITING_PAYMENT':
@@ -173,12 +178,12 @@ export class BotEngine {
     if (!session.isRegistered && !session.hostel) {
       session.step = 'ONBOARDING_NAME';
       sessionManager.saveSession(session);
-      const greeting = session.studentName ? `Hi ${session.studentName}! ` : '';
+      const greeting = session.studentName ? `Hi ${session.studentName}. ` : '';
       await ChannelService.sendMessage(
         session,
-        `👋 ${greeting}Welcome to *EU Bite* — Campus Food Delivery!\n\n` +
-          `Before your first order, let's set up your delivery profile in 2 quick steps.\n\n` +
-          `What is your *Full Name*? (or reply *skip* to proceed with guest profile)`
+        `*EU Bite*\nCampus Food Delivery\n\n` +
+          `${greeting}Set up your delivery details to get started.\n\n` +
+          `What is your Full Name? (or reply "skip" to proceed)`
       );
       return 'Awaiting Onboarding Name';
     }
@@ -245,9 +250,9 @@ export class BotEngine {
 
   private static async handleOnboardingName(session: UserSession, text: string): Promise<string> {
     if (text.toLowerCase() !== 'skip') {
-      session.studentName = text;
+      session.studentName = text.trim();
     } else {
-      session.studentName = session.studentName || 'Campus Student';
+      session.studentName = session.studentName || 'Student';
     }
 
     if (session.channel === 'telegram' && !session.realPhone) {
@@ -255,9 +260,9 @@ export class BotEngine {
       sessionManager.saveSession(session);
       await ChannelService.sendMessage(
         session,
-        `Nice to meet you, *${session.studentName}*!\n\n` +
-          `📱 What is your Nigerian WhatsApp / Phone number?\n` +
-          `_(Used for rider arrival calls and payment receipts, e.g. 08012345678)_`
+        `Nice to meet you, *${session.studentName}*.\n\n` +
+          `What is your Nigerian phone number?\n` +
+          `_(e.g. 08012345678, used for rider calls upon arrival)_`
       );
       return 'Awaiting Phone Number';
     }
@@ -270,7 +275,7 @@ export class BotEngine {
     if (cleaned.length < 10) {
       await ChannelService.sendMessage(
         session,
-        '⚠️ Please provide a valid Nigerian phone number (e.g. *08012345678* or *+2348012345678*).'
+        'Please provide a valid Nigerian phone number (e.g. *08012345678* or *+2348012345678*).'
       );
       return 'Invalid Phone Number';
     }
@@ -284,13 +289,17 @@ export class BotEngine {
     session.step = 'ONBOARDING_HOSTEL';
     sessionManager.saveSession(session);
 
-    let msg = `🏠 *Select Your Campus Hostel:*\n\n`;
+    let msg = `*Select Your Campus Hostel:*\n\n`;
     CAMPUS_HOSTELS.forEach((h, i) => {
-      msg += `${i + 1}️⃣ *${h}*\n`;
+      msg += `${i + 1}. ${h}\n`;
     });
-    msg += `\n_Reply with the number (1-5) or type your hostel name._`;
+    msg += `\nReply with the number (1-5) or choose below:`;
 
-    const buttons = CAMPUS_HOSTELS.map((h, i) => ({ id: String(i + 1), title: h }));
+    const buttons: InteractiveOption[] = CAMPUS_HOSTELS.map((h, i) => ({
+      id: String(i + 1),
+      title: `${i + 1}. ${h}`,
+      description: 'Hostel delivery block',
+    }));
     await ChannelService.sendQuickReplyButtons(session, msg, buttons);
     return 'Prompted Hostel Selection';
   }
@@ -309,8 +318,7 @@ export class BotEngine {
 
     await ChannelService.sendMessage(
       session,
-      `📍 Selected: *${session.hostel}*\n\n` +
-        `What is your Room number? (e.g. *Room 214*, *Room B12*)`
+      `Selected: *${session.hostel}*\n\nWhat is your Room number? (e.g. *Room 214*, *Room B12*)`
     );
     return 'Awaiting Room Number';
   }
@@ -334,10 +342,10 @@ export class BotEngine {
 
     await ChannelService.sendMessage(
       session,
-      `🎉 *Profile Setup Complete!*\n\n` +
-        `👤 *${session.studentName}*\n` +
-        `📍 *${session.hostel}, ${session.room}*\n\n` +
-        `You can now mix & match food from any campus vendor!`
+      `*Profile Setup Complete*\n\n` +
+        `• Name: ${session.studentName}\n` +
+        `• Location: ${session.hostel}, ${session.room}\n\n` +
+        `You can now order from any campus kitchen.`
     );
 
     return this.sendMainMenu(session);
@@ -351,23 +359,23 @@ export class BotEngine {
     session.step = 'PROFILE_VIEW';
     sessionManager.saveSession(session);
 
-    const name = session.studentName || 'Campus Student';
+    const name = session.studentName || 'Student';
     const phone = session.realPhone || session.phone;
     const hostel = session.hostel || 'Hostel Block C';
     const room = session.room || 'Room 214';
 
     const msg =
-      `👤 *My Student Profile*\n\n` +
-      `• *Name:* ${name}\n` +
-      `• *Phone:* ${phone}\n` +
-      `• *Drop-off:* ${hostel}, ${room}\n\n` +
+      `*Student Profile*\n\n` +
+      `• Name: ${name}\n` +
+      `• Phone: ${phone}\n` +
+      `• Delivery: ${hostel}, ${room}\n\n` +
       `Select an option below to update your details or return to menu:`;
 
-    const buttons = [
-      { id: 'edit_room', title: '✏️ Change Hostel / Room' },
-      { id: 'edit_phone', title: '📱 Update Phone' },
-      { id: 'edit_name', title: '👤 Change Name' },
-      { id: 'menu', title: '🏠 Main Menu' },
+    const buttons: InteractiveOption[] = [
+      { id: 'edit_room', title: 'Change Room/Hostel', description: 'Update delivery room' },
+      { id: 'edit_phone', title: 'Update Phone', description: 'Update contact number' },
+      { id: 'edit_name', title: 'Change Name', description: 'Update profile name' },
+      { id: 'menu', title: 'Main Menu', description: 'Return home' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, msg, buttons);
@@ -384,13 +392,13 @@ export class BotEngine {
     if (lower === 'edit_phone' || lower.includes('phone')) {
       session.step = 'PROFILE_EDIT_PHONE';
       sessionManager.saveSession(session);
-      await ChannelService.sendMessage(session, '📱 Please type your updated Nigerian phone number:');
+      await ChannelService.sendMessage(session, 'Please type your updated Nigerian phone number:');
       return 'Awaiting Phone Update';
     }
     if (lower === 'edit_name' || lower.includes('name')) {
       session.step = 'PROFILE_EDIT_NAME';
       sessionManager.saveSession(session);
-      await ChannelService.sendMessage(session, '👤 Please type your updated Full Name:');
+      await ChannelService.sendMessage(session, 'Please type your updated Full Name:');
       return 'Awaiting Name Update';
     }
     return this.sendMainMenu(session);
@@ -399,12 +407,12 @@ export class BotEngine {
   private static async handleUpdatePhone(session: UserSession, text: string): Promise<string> {
     const cleaned = text.replace(/[^0-9+]/g, '');
     if (cleaned.length < 10) {
-      await ChannelService.sendMessage(session, '⚠️ Please provide a valid Nigerian phone number.');
+      await ChannelService.sendMessage(session, 'Please provide a valid Nigerian phone number.');
       return 'Invalid Phone Number';
     }
     session.realPhone = cleaned.startsWith('0') ? `+234${cleaned.slice(1)}` : cleaned;
     sessionManager.saveSession(session);
-    await ChannelService.sendMessage(session, `✅ Phone updated to *${session.realPhone}*.`);
+    await ChannelService.sendMessage(session, `Phone updated to *${session.realPhone}*.`);
     return this.displayProfile(session);
   }
 
@@ -418,7 +426,7 @@ export class BotEngine {
     }
     session.step = 'PROFILE_EDIT_ROOM';
     sessionManager.saveSession(session);
-    await ChannelService.sendMessage(session, `📍 Selected: *${session.hostel}*\n\nWhat is your room number?`);
+    await ChannelService.sendMessage(session, `Selected: *${session.hostel}*\n\nWhat is your room number?`);
     return 'Awaiting Room Update';
   }
 
@@ -431,31 +439,30 @@ export class BotEngine {
     sessionManager.saveSession(session);
 
     const cartCount = session.cart.reduce((a, b) => a + b.quantity, 0);
-    const channelName = session.channel === 'telegram' ? 'Telegram' : 'WhatsApp';
 
     let header = '';
     if (isWelcome) {
-      const greeting = session.studentName ? `Hi *${session.studentName}*! 👋 Welcome to *EU Bite* 🍔🛵` : 'Welcome to *EU Bite*! 🍔🛵';
-      header = `${greeting}\nYour campus food ordering companion on ${channelName}.\n\n`;
+      const greeting = session.studentName ? `Hi ${session.studentName}. ` : '';
+      header = `*EU Bite*\nCampus Food Delivery\n\n${greeting}Order meals directly to your hostel room.\n\n`;
     } else {
-      header = `🍔 *Main Menu*\n\n`;
+      header = `*Main Menu*\n\n`;
     }
 
     const menuMessage =
       `${header}` +
-      `1️⃣ *Browse Campus Restaurants*\n` +
-      `2️⃣ *View Tray (${cartCount} item${cartCount === 1 ? '' : 's'})*\n` +
-      `3️⃣ *Track Active Order*\n` +
-      `4️⃣ *My Profile*\n` +
-      `5️⃣ *Student Support & Help*\n\n` +
-      `_Reply 1-5 or tap below:_`;
+      `1. Browse Campus Restaurants\n` +
+      `2. View Tray (${cartCount} item${cartCount === 1 ? '' : 's'})\n` +
+      `3. Track Active Order\n` +
+      `4. My Profile\n` +
+      `5. Student Support & Help\n\n` +
+      `Reply 1-5 or choose below:`;
 
-    const buttons = [
-      { id: '1', title: '🍽️ Restaurants' },
-      { id: '2', title: `🛒 Tray (${cartCount})` },
-      { id: '3', title: '📍 Track Order' },
-      { id: 'profile', title: '👤 My Profile' },
-      { id: '5', title: '📞 Help' },
+    const buttons: InteractiveOption[] = [
+      { id: '1', title: '1. Restaurants', description: 'Browse open kitchens & menus' },
+      { id: '2', title: `2. Tray (${cartCount})`, description: 'Review your selected items' },
+      { id: '3', title: '3. Track Order', description: 'Live status of your delivery' },
+      { id: 'profile', title: '4. My Profile', description: 'Room and contact information' },
+      { id: '5', title: '5. Support', description: 'Help and campus assistance' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, menuMessage, buttons);
@@ -496,28 +503,29 @@ export class BotEngine {
       if (restaurants.length === 0) {
         await ChannelService.sendMessage(
           session,
-          'No campus restaurants are currently accepting orders. Please check back shortly!'
+          'No campus restaurants are currently accepting orders. Please check back shortly.'
         );
         return 'No restaurants';
       }
 
-      let msg = `🍽️ *Campus Restaurants Open Now:*\n\n`;
+      let msg = `*Campus Restaurants Open Now:*\n\n`;
       restaurants.forEach((r: any, idx: number) => {
         msg += `*${idx + 1}. ${r.name}*\n_${r.description}_\nHours: ${r.opening_time} - ${r.closing_time}\n\n`;
       });
-      msg += `_Tip: You can mix items from different restaurants in your tray!_\nReply with the restaurant number (e.g. 1) to view items:`;
+      msg += `Tip: You can mix items from different restaurants in your tray.\nReply with the restaurant number (e.g. 1) to view items:`;
 
       session.step = 'SELECTING_RESTAURANT';
       sessionManager.saveSession(session);
 
-      const buttons = restaurants.map((r: any, idx: number) => ({
+      const buttons: InteractiveOption[] = restaurants.map((r: any, idx: number) => ({
         id: String(idx + 1),
         title: `${idx + 1}. ${r.name}`,
+        description: `Open ${r.opening_time} - ${r.closing_time}`,
       }));
       if (session.cart.length > 0) {
-        buttons.push({ id: 'cart', title: `🛒 View Tray (${session.cart.reduce((a, b) => a + b.quantity, 0)})` });
+        buttons.push({ id: 'cart', title: `View Tray (${session.cart.reduce((a, b) => a + b.quantity, 0)})`, description: 'Proceed to checkout' });
       }
-      buttons.push({ id: 'back', title: '🔙 Back to Menu' });
+      buttons.push({ id: 'back', title: 'Back to Menu' });
 
       await ChannelService.sendQuickReplyButtons(session, msg, buttons);
       return 'Restaurant list sent';
@@ -575,39 +583,44 @@ export class BotEngine {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const pageItems = items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    const pageBadge = totalPages > 1 ? ` (Page ${currentPage} of ${totalPages})` : '';
-    let msg = `📋 *Menu: ${selected.name}*${pageBadge}\n\n`;
+    const pageBadge = totalPages > 1 ? ` (${currentPage}/${totalPages})` : '';
+    let msg = `*${selected.name}*${pageBadge}\n\n`;
 
     pageItems.forEach((item: any, localIdx: number) => {
       const globalIdx = startIndex + localIdx + 1;
       const priceNgn = item.price_ngn ?? (item.price_kobo ? item.price_kobo / 100 : item.price ?? 0);
-      msg += `*${globalIdx}. ${item.name}* — *₦${Number(priceNgn).toLocaleString()}*\n_${item.description || ''}_\n\n`;
+      msg += `*${globalIdx}. ${item.name}* — ₦${Number(priceNgn).toLocaleString()}\n`;
+      if (item.description) {
+        msg += `_${item.description}_\n`;
+      }
+      msg += '\n';
     });
 
-    msg += `_Tap a dish below or reply with number (e.g. *${startIndex + 1}* or *${startIndex + 1} x2*). Tap ℹ️ for instructions._`;
+    msg += `Reply with dish number (e.g. *${startIndex + 1}* or *${startIndex + 1} x2*) or select below:`;
 
-    // Render buttons for items on this page (max 5 dishes)
-    const buttons: Array<{ id: string; title: string }> = pageItems.map((item: any, localIdx: number) => {
+    const buttons: InteractiveOption[] = pageItems.map((item: any, localIdx: number) => {
       const globalIdx = startIndex + localIdx + 1;
+      const priceNgn = item.price_ngn ?? (item.price_kobo ? item.price_kobo / 100 : item.price ?? 0);
       return {
         id: String(globalIdx),
-        title: `${globalIdx}. ${item.name}`,
+        title: `${globalIdx}. ${item.name}`.slice(0, 24),
+        description: `₦${Number(priceNgn).toLocaleString()}`,
       };
     });
 
-    // Pagination controls
     if (currentPage > 1) {
-      buttons.push({ id: `page_${currentPage - 1}`, title: `⬅️ Page ${currentPage - 1}` });
+      buttons.push({ id: `page_${currentPage - 1}`, title: `Page ${currentPage - 1}`, description: 'Previous dishes' });
     }
     if (currentPage < totalPages) {
-      buttons.push({ id: `page_${currentPage + 1}`, title: `➡️ Page ${currentPage + 1}` });
+      buttons.push({ id: `page_${currentPage + 1}`, title: `Page ${currentPage + 1}`, description: 'Next dishes' });
     }
 
-    buttons.push({ id: 'menu_help', title: 'ℹ️ How to Order' });
-    buttons.push({ id: 'cart', title: `🛒 Tray (${session.cart.reduce((a, b) => a + b.quantity, 0)})` });
-    buttons.push({ id: 'back', title: '🍽️ Other Restaurants' });
+    buttons.push({ id: 'menu_help', title: 'How to Order', description: 'Ordering instructions' });
+    const cartCount = session.cart.reduce((a, b) => a + b.quantity, 0);
+    buttons.push({ id: 'cart', title: `Tray (${cartCount})`, description: 'View current tray' });
+    buttons.push({ id: 'back', title: 'Other Restaurants', description: 'Campus vendor list' });
 
-    await ChannelService.sendQuickReplyButtons(session, msg, buttons);
+    await ChannelService.sendInteractiveList(session, msg, 'Select Dish', buttons, selected.name);
     return 'Menu displayed';
   }
 
@@ -620,25 +633,24 @@ export class BotEngine {
     sessionManager.saveSession(session);
 
     const msg =
-      `ℹ️ *How to Order on EU Bite*\n\n` +
-      `1️⃣ *Selecting Dishes:*\n` +
-      `• Tap any dish button or reply with the item number (e.g. *1*).\n` +
+      `*How to Order on EU Bite*\n\n` +
+      `1. Selecting Dishes:\n` +
+      `• Tap any dish or reply with the item number (e.g. *1*).\n` +
       `• For multiple portions, add *x [quantity]* (e.g. *1 x2* or *2 portions of 1*).\n` +
-      `• You can also type dish names directly (e.g. *Jollof* or *Fried Rice*).\n\n` +
-      `2️⃣ *Multi-Vendor Freedom:*\n` +
-      `• Mix items from different restaurants into one tray without losing items!\n\n` +
-      `3️⃣ *Tray Management:*\n` +
-      `• Type *cart* or tap *View Tray* anytime to inspect your tray, edit portions, add meal preparation notes (e.g. "no pepper"), or checkout.\n\n` +
-      `4️⃣ *Navigation:*\n` +
-      `• Tap *Next Page* or *Prev Page* to browse all menu items (5 dishes per page).\n` +
-      `• Tap *Back to Dishes* below to return to your current menu.\n\n` +
-      `_Tap below to return to your menu:_`;
+      `• You can also type dish names directly.\n\n` +
+      `2. Multi-Vendor Freedom:\n` +
+      `• Mix items from different campus spots into one tray.\n\n` +
+      `3. Tray Management:\n` +
+      `• Type *cart* anytime to view your tray, adjust portions, add cooking notes, or checkout.\n\n` +
+      `4. Quick PIN:\n` +
+      `• Type */pin* anytime to view your secret 4-digit Delivery PIN.\n\n` +
+      `Choose an option below:`;
 
     const cartCount = session.cart.reduce((a, b) => a + b.quantity, 0);
-    const buttons = [
-      { id: 'back_to_menu', title: '🔙 Back to Dishes' },
-      { id: 'cart', title: `🛒 Tray (${cartCount})` },
-      { id: 'back_to_vendors', title: '🍽️ Other Restaurants' },
+    const buttons: InteractiveOption[] = [
+      { id: 'back_to_menu', title: 'Back to Dishes', description: 'Return to current restaurant menu' },
+      { id: 'cart', title: `Tray (${cartCount})`, description: 'Review your selected items' },
+      { id: 'back_to_vendors', title: 'Other Restaurants', description: 'Browse all open kitchens' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, msg, buttons);
@@ -671,7 +683,6 @@ export class BotEngine {
         return this.displayRestaurantMenu(session, r, session.menuPage || 1);
       }
 
-      // If user typed a dish number or name directly while on instructions screen, transition back to item selection
       session.step = 'BROWSING_ITEMS';
       sessionManager.saveSession(session);
       return this.handleItemSelection(session, text);
@@ -715,7 +726,7 @@ export class BotEngine {
       return this.displayRestaurantList(session);
     }
 
-    // ℹ️ Separate Instructions Page Trigger
+    // Instructions Page Trigger
     if (
       lower === 'menu_help' ||
       lower === 'info' ||
@@ -764,7 +775,6 @@ export class BotEngine {
       return this.handleRemoveItem(session, lower);
     }
 
-
     try {
       const response = await CentralApiClient.getRestaurantsAndMenus();
       const restaurant = (response.data || []).find((r: any) => r.id === session.selectedRestaurantId) || (response.data || [])[0];
@@ -774,46 +784,47 @@ export class BotEngine {
 
       const items: any[] = restaurant.items || restaurant.menu || [];
 
-      // 1. Parse index & quantity: e.g. "1", "1 x2", "1 * 3", "2 portions of 1"
+      // 1. Parse index & quantity strictly
       let itemIdx = -1;
       let qty = 1;
 
-      if (lower.includes('x') || lower.includes('*')) {
+      if (/^\s*\d+\s*[x*]\s*\d+\s*$/i.test(lower)) {
         const parts = lower.split(/x|\*/i);
         itemIdx = parseInt(parts[0].trim(), 10) - 1;
         qty = parseInt(parts[1].trim(), 10) || 1;
-      } else {
-        const match = lower.match(/\d+/);
-        if (match) {
-          itemIdx = parseInt(match[0], 10) - 1;
-          if (lower.includes('portion') || lower.includes('plate') || lower.includes('pack')) {
-            const qtyMatch = lower.match(/^(\d+)\s*(portions?|plates?|packs?)/);
-            if (qtyMatch) {
-              qty = parseInt(qtyMatch[1], 10) || 1;
-            }
-          }
+      } else if (/^\s*(\d+)\s*(?:portions?|plates?|packs?)\s*(?:of)?\s*(\d+)\s*$/i.test(lower)) {
+        const m = lower.match(/^\s*(\d+)\s*(?:portions?|plates?|packs?)\s*(?:of)?\s*(\d+)\s*$/i);
+        if (m) {
+          qty = parseInt(m[1], 10) || 1;
+          itemIdx = parseInt(m[2], 10) - 1;
+        }
+      } else if (/^\s*(\d+)\s*$/.test(lower)) {
+        itemIdx = parseInt(lower, 10) - 1;
+      } else if (/^\s*(\d+)\s*(?:portions?|plates?|packs?)\s*$/i.test(lower)) {
+        const m = lower.match(/^\s*(\d+)\s*(?:portions?|plates?|packs?)\s*$/i);
+        if (m) {
+          itemIdx = parseInt(m[1], 10) - 1;
         }
       }
 
-      // 2. If no valid numeric index found, try matching by dish name
+      // 2. If no numeric index found, try matching dish name
       let item: any = null;
       if (itemIdx >= 0 && itemIdx < items.length) {
         item = items[itemIdx];
       } else {
-        item = items.find((i: any) => lower.includes(i.name.toLowerCase()));
+        item = items.find((i: any) => lower === i.name.toLowerCase() || lower.includes(i.name.toLowerCase()));
       }
 
       if (!item) {
         await ChannelService.sendMessage(
           session,
-          `⚠️ Item "${text}" not recognized. Please reply with a number (1-${items.length}) or the dish name (or reply *cart* / *back*).`
+          `Item "${text}" not recognized. Reply with dish number (1-${items.length}) or the dish name (or reply *cart* / *back*).`
         );
         return 'Item not found';
       }
 
       const priceKobo = item.price_kobo ?? (item.price_ngn ? item.price_ngn * 100 : (item.price ? item.price * 100 : 0));
 
-      // Multi-restaurant cart: record restaurant info for this item
       const existing = session.cart.find((c) => c.itemId === item.id);
       if (existing) {
         existing.quantity += qty;
@@ -847,17 +858,17 @@ export class BotEngine {
     const subtotalNgn = session.cart.reduce((sum, i) => sum + i.priceKobo * i.quantity, 0) / 100;
 
     const feedback =
-      `✅ Added *${item.name}* (x${addedQty}) to your tray!\n\n` +
-      `🏪 Vendor: *${session.selectedRestaurantName || 'Campus Spot'}*\n` +
-      `🛒 Tray Total: *₦${subtotalNgn.toLocaleString()}* (${cartCount} items)\n\n` +
-      `What would you like to do next?`;
+      `Added *${item.name}* (x${addedQty}) to your tray.\n\n` +
+      `• Vendor: ${session.selectedRestaurantName || 'Campus Spot'}\n` +
+      `• Tray Subtotal: ₦${subtotalNgn.toLocaleString()} (${cartCount} item${cartCount === 1 ? '' : 's'})\n\n` +
+      `Choose next action:`;
 
-    const buttons = [
-      { id: 'plus_1', title: '➕ Add Another (+1)' },
-      { id: 'minus_1', title: '➖ Less (-1)' },
-      { id: 'add_more_food', title: '🍽️ Add More Dishes' },
-      { id: 'cart', title: `🛒 View Tray (₦${subtotalNgn.toLocaleString()})` },
-      { id: 'checkout', title: '💳 Proceed to Checkout' },
+    const buttons: InteractiveOption[] = [
+      { id: 'plus_1', title: '+ Add Another', description: `Add 1 more ${item.name}`.slice(0, 72) },
+      { id: 'minus_1', title: '- Remove One', description: `Reduce ${item.name}`.slice(0, 72) },
+      { id: 'add_more_food', title: 'Add Dishes', description: 'Browse more menu items' },
+      { id: 'cart', title: `Tray (₦${subtotalNgn.toLocaleString()})`, description: 'Review your order' },
+      { id: 'checkout', title: 'Checkout', description: 'Proceed to payment' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, feedback, buttons);
@@ -873,7 +884,7 @@ export class BotEngine {
     item.quantity += delta;
     if (item.quantity <= 0) {
       session.cart = session.cart.filter((c) => c.itemId !== itemId);
-      await ChannelService.sendMessage(session, `🗑️ Removed *${item.name}* from your tray.`);
+      await ChannelService.sendMessage(session, `Removed *${item.name}* from your tray.`);
     } else {
       await ChannelService.sendMessage(
         session,
@@ -895,11 +906,11 @@ export class BotEngine {
   private static async displayCart(session: UserSession): Promise<string> {
     if (session.cart.length === 0) {
       const emptyMsg =
-        '🛒 *Your tray is currently empty.*\n\n' +
-        'Browse open campus spots and mix food from any restaurant!';
-      const buttons = [
-        { id: '1', title: '🍽️ Browse Restaurants' },
-        { id: 'menu', title: '🏠 Main Menu' },
+        '*Your tray is currently empty.*\n\n' +
+        'Browse campus spots to mix food from any restaurant.';
+      const buttons: InteractiveOption[] = [
+        { id: '1', title: 'Browse Restaurants', description: 'Open campus vendors' },
+        { id: 'menu', title: 'Main Menu', description: 'Return home' },
       ];
       await ChannelService.sendQuickReplyButtons(session, emptyMsg, buttons);
       session.step = 'MAIN_MENU';
@@ -920,52 +931,49 @@ export class BotEngine {
       grouped.get(restName)!.push(item);
     }
 
-    let msg = `🛒 *Your EU Bite Tray (${grouped.size} Vendor${grouped.size === 1 ? '' : 's'}):*\n\n`;
+    let msg = `*Your Tray* (${grouped.size} vendor${grouped.size === 1 ? '' : 's'}):\n\n`;
 
     let globalIdx = 1;
     for (const [restName, items] of grouped.entries()) {
-      msg += `🏪 *${restName}*\n`;
+      msg += `*${restName}*\n`;
       for (const i of items) {
         const lineTotal = (i.priceKobo * i.quantity) / 100;
-        const noteStr = i.note ? `\n   ↳ 📝 _"${i.note}"_` : '';
-        msg += `${globalIdx}. *${i.name}* x${i.quantity} — ₦${lineTotal.toLocaleString()}${noteStr}\n`;
+        const noteStr = i.note ? `\n   ↳ Note: _"${i.note}"_` : '';
+        msg += `${globalIdx}. ${i.name} x${i.quantity} — ₦${lineTotal.toLocaleString()}${noteStr}\n`;
         globalIdx++;
       }
       msg += '\n';
     }
 
-    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `🍲 *Food Subtotal: ₦${foodSubtotal.toLocaleString()}*\n`;
+    msg += `Food Subtotal: *₦${foodSubtotal.toLocaleString()}*\n`;
 
-    const buttons = [];
+    const buttons: InteractiveOption[] = [];
 
     if (foodSubtotal < 1500) {
       const needed = 1500 - foodSubtotal;
       msg +=
-        `\n⚠️ *Notice:* Minimum food order is *₦1,500* before fees.\n` +
+        `\nNotice: Minimum food order is *₦1,500* before fees.\n` +
         `Add items worth at least *₦${needed.toLocaleString()}* more.\n`;
 
-      buttons.push({ id: 'add_more', title: '🍽️ Add More Food' });
-      buttons.push({ id: 'clear_cart', title: '🗑️ Clear Tray' });
-      buttons.push({ id: 'menu', title: '🏠 Main Menu' });
+      buttons.push({ id: 'add_more', title: 'Add More Food', description: 'Browse open menus' });
+      buttons.push({ id: 'clear_cart', title: 'Clear Tray', description: 'Empty your tray' });
+      buttons.push({ id: 'menu', title: 'Main Menu', description: 'Return home' });
     } else {
       msg +=
-        `\n✅ Minimum order subtotal met!\n\n` +
-        `• Tap buttons below to edit quantity (+ / -)\n` +
-        `• Type *remove #* to delete an item\n` +
-        `• Type *note #* to add cooking instructions\n` +
-        `• Tap *Proceed to Checkout* when ready!`;
+        `\n• Tap options below or reply *remove #* to delete\n` +
+        `• Type *note #* to add cooking notes\n` +
+        `• Tap Checkout when ready`;
 
       // Quick actions for items in cart
       session.cart.forEach((i, idx) => {
-        buttons.push({ id: `plus_${idx + 1}`, title: `➕ ${i.name.slice(0, 10)}` });
-        buttons.push({ id: `minus_${idx + 1}`, title: `➖ ${i.name.slice(0, 10)}` });
+        buttons.push({ id: `plus_${idx + 1}`, title: `+1 ${i.name}`.slice(0, 24), description: `Increase ${i.name}`.slice(0, 72) });
+        buttons.push({ id: `minus_${idx + 1}`, title: `-1 ${i.name}`.slice(0, 24), description: `Decrease ${i.name}`.slice(0, 72) });
       });
 
-      buttons.push({ id: 'checkout', title: '💳 Proceed to Checkout' });
-      buttons.push({ id: 'add_more', title: '➕ Add More' });
-      buttons.push({ id: 'add_note', title: '📝 Add Meal Note' });
-      buttons.push({ id: 'clear_cart', title: '🗑️ Clear Tray' });
+      buttons.push({ id: 'checkout', title: 'Proceed to Checkout', description: 'Packaging and delivery details' });
+      buttons.push({ id: 'add_more', title: 'Add More Food', description: 'Continue shopping' });
+      buttons.push({ id: 'add_note', title: 'Add Meal Note', description: 'Special instructions' });
+      buttons.push({ id: 'clear_cart', title: 'Clear Tray', description: 'Empty your tray' });
     }
 
     await ChannelService.sendQuickReplyButtons(session, msg, buttons);
@@ -1024,11 +1032,11 @@ export class BotEngine {
         `• Reply *+* to add 1\n` +
         `• Reply *-* to remove 1\n` +
         `• Reply *delete* to remove from tray`;
-      const buttons = [
-        { id: `plus_${num}`, title: `➕ Add 1 (+1)` },
-        { id: `minus_${num}`, title: `➖ Less 1 (-1)` },
-        { id: `rm_${num}`, title: `🗑️ Delete Item` },
-        { id: 'cart', title: `🔙 Back to Tray` },
+      const buttons: InteractiveOption[] = [
+        { id: `plus_${num}`, title: `Add 1 (+1)` },
+        { id: `minus_${num}`, title: `Less 1 (-1)` },
+        { id: `rm_${num}`, title: `Delete Item` },
+        { id: 'cart', title: `Back to Tray` },
       ];
       await ChannelService.sendQuickReplyButtons(session, prompt, buttons);
       return 'Editing cart item';
@@ -1055,8 +1063,8 @@ export class BotEngine {
         sessionManager.saveSession(session);
         await ChannelService.sendMessage(
           session,
-          `📝 What special instruction would you like to add for *${session.cart[idx].name}*?\n` +
-            `_(e.g. "No pepper", "Pack soup separately", "Extra stew", "Crispy meat")_`
+          `What special instruction would you like to add for *${session.cart[idx].name}*?\n` +
+            `_(e.g. "No pepper", "Pack soup separately", "Extra sauce")_`
         );
         return 'Awaiting item note text';
       }
@@ -1067,7 +1075,7 @@ export class BotEngine {
     sessionManager.saveSession(session);
     await ChannelService.sendMessage(
       session,
-      `📝 What special instruction would you like to add for *${session.cart[0].name}*?\n` +
+      `What special instruction would you like to add for *${session.cart[0].name}*?\n` +
         `_(e.g. "No pepper", "Extra sauce", "Pack soup separately")_`
     );
     return 'Awaiting item note text';
@@ -1083,7 +1091,7 @@ export class BotEngine {
     if (item) {
       item.note = text.trim();
       sessionManager.saveSession(session);
-      await ChannelService.sendMessage(session, `✅ Added note to *${item.name}*: "${item.note}"`);
+      await ChannelService.sendMessage(session, `Added note to *${item.name}*: "${item.note}"`);
     }
 
     session.activeNoteItemId = undefined;
@@ -1096,7 +1104,7 @@ export class BotEngine {
 
   private static async promptClearCartConfirmation(session: UserSession): Promise<string> {
     if (session.cart.length === 0) {
-      await ChannelService.sendMessage(session, '🛒 Your tray is already empty.');
+      await ChannelService.sendMessage(session, 'Your tray is already empty.');
       return 'Cart empty';
     }
 
@@ -1104,13 +1112,13 @@ export class BotEngine {
     sessionManager.saveSession(session);
 
     const prompt =
-      `⚠️ *Empty Entire Tray?*\n\n` +
+      `*Empty Entire Tray?*\n\n` +
       `This will remove all ${session.cart.length} item(s) from your tray.\n\n` +
       `Are you sure you want to proceed?`;
 
-    const buttons = [
-      { id: 'yes_clear', title: '🗑️ Yes, Clear Tray' },
-      { id: 'no_keep', title: '❌ No, Keep Tray' },
+    const buttons: InteractiveOption[] = [
+      { id: 'yes_clear', title: 'Yes, Clear Tray' },
+      { id: 'no_keep', title: 'No, Keep Tray' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, prompt, buttons);
@@ -1124,17 +1132,17 @@ export class BotEngine {
       session.selectedRestaurantId = undefined;
       session.selectedRestaurantName = undefined;
       sessionManager.saveSession(session);
-      await ChannelService.sendMessage(session, '🗑️ Your tray has been cleared.');
+      await ChannelService.sendMessage(session, 'Your tray has been cleared.');
       return this.sendMainMenu(session);
     } else {
-      await ChannelService.sendMessage(session, '👍 Tray kept intact.');
+      await ChannelService.sendMessage(session, 'Tray kept intact.');
       return this.displayCart(session);
     }
   }
 
   private static async handleRemoveItem(session: UserSession, text: string): Promise<string> {
     if (session.cart.length === 0) {
-      await ChannelService.sendMessage(session, '🛒 Your tray is already empty.');
+      await ChannelService.sendMessage(session, 'Your tray is already empty.');
       return 'Cart empty';
     }
 
@@ -1151,7 +1159,7 @@ export class BotEngine {
     if (idx < 0 || idx >= session.cart.length) {
       await ChannelService.sendMessage(
         session,
-        `⚠️ Item #${numMatch[0]} not in tray. Reply *cart* to view current items.`
+        `Item #${numMatch[0]} not in tray. Reply *cart* to view current items.`
       );
       return 'Invalid remove index';
     }
@@ -1159,10 +1167,10 @@ export class BotEngine {
     const removed = session.cart[idx];
     if (removed.quantity > 1) {
       removed.quantity -= 1;
-      await ChannelService.sendMessage(session, `➖ Reduced *${removed.name}* quantity to ${removed.quantity}.`);
+      await ChannelService.sendMessage(session, `Reduced *${removed.name}* quantity to ${removed.quantity}.`);
     } else {
       session.cart.splice(idx, 1);
-      await ChannelService.sendMessage(session, `🗑️ Removed *${removed.name}* from your tray.`);
+      await ChannelService.sendMessage(session, `Removed *${removed.name}* from your tray.`);
     }
 
     sessionManager.saveSession(session);
@@ -1179,7 +1187,7 @@ export class BotEngine {
       const needed = 1500 - foodSubtotal;
       await ChannelService.sendMessage(
         session,
-        `⚠️ Your food subtotal is ₦${foodSubtotal.toLocaleString()}.\nEU Bite has a minimum order amount of *₦1,500*.\nPlease add items worth *₦${needed.toLocaleString()}* more.`
+        `Your food subtotal is ₦${foodSubtotal.toLocaleString()}.\nMinimum order is *₦1,500*.\nPlease add items worth *₦${needed.toLocaleString()}* more.`
       );
       return this.displayRestaurantList(session);
     }
@@ -1192,17 +1200,17 @@ export class BotEngine {
     const stdFee = 500 * totalContainers;
 
     const packagingMsg =
-      `📦 *Select Food Packaging (${totalContainers} Meal Container${totalContainers === 1 ? '' : 's'}):*\n\n` +
-      `1️⃣ *EU Bite Reusable Eco-Pack* (+₦${ecoFee.toLocaleString()})\n` +
-      `_Sanitized, microwave-safe reusable pack with ₦${(250 * totalContainers).toLocaleString()} refundable cashback deposit upon return at hostel drop boxes._\n\n` +
-      `2️⃣ *Cafeteria Standard Pack* (+₦${stdFee.toLocaleString()})\n` +
-      `_Single-use takeaway container._\n\n` +
-      `_Reply 1 for Eco-Pack or 2 for Standard Pack:_`;
+      `*Food Packaging* (${totalContainers} container${totalContainers === 1 ? '' : 's'}):\n\n` +
+      `1. *Reusable Eco-Pack* (+₦${ecoFee.toLocaleString()})\n` +
+      `Sanitized, microwave-safe container with ₦${ecoFee.toLocaleString()} refundable deposit upon return at hostel drop boxes.\n\n` +
+      `2. *Standard Pack* (+₦${stdFee.toLocaleString()})\n` +
+      `Single-use takeaway container.\n\n` +
+      `Reply 1 or 2, or choose below:`;
 
-    const buttons = [
-      { id: '1', title: `🌱 Reusable Eco-Pack (+₦${ecoFee.toLocaleString()})` },
-      { id: '2', title: `📦 Standard Pack (+₦${stdFee.toLocaleString()})` },
-      { id: 'back', title: '🔙 Back to Tray' },
+    const buttons: InteractiveOption[] = [
+      { id: '1', title: `1. Reusable Eco-Pack (+₦${ecoFee.toLocaleString()})`, description: 'Eco-friendly refundable pack' },
+      { id: '2', title: `2. Standard Pack (+₦${stdFee.toLocaleString()})`, description: 'Single-use takeaway' },
+      { id: 'back', title: 'Back to Tray', description: 'Edit your items' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, packagingMsg, buttons);
@@ -1222,7 +1230,7 @@ export class BotEngine {
     } else {
       await ChannelService.sendMessage(
         session,
-        'Please reply *1* for EU Bite Reusable Eco-Pack or *2* for Standard Pack.'
+        'Please reply *1* for Reusable Eco-Pack or *2* for Standard Pack.'
       );
       return 'Invalid packaging selection';
     }
@@ -1241,16 +1249,16 @@ export class BotEngine {
     const defaultAddress = session.hostel ? `${session.hostel}, ${session.room}` : 'Hostel Block C, Room 214';
 
     const promptMsg =
-      `📍 *Confirm Delivery Location:*\n\n` +
+      `*Confirm Delivery Location:*\n\n` +
       `Drop-off: *${defaultAddress}*\n\n` +
       `• Reply *YES* to deliver here\n` +
       `• Reply *CHANGE* to update hostel block or room\n` +
       `• Reply *BACK* to return to packaging`;
 
-    const buttons = [
-      { id: 'yes', title: '✅ Deliver Here' },
-      { id: 'change', title: '✏️ Change Address' },
-      { id: 'back', title: '🔙 Back' },
+    const buttons: InteractiveOption[] = [
+      { id: 'yes', title: 'Confirm Location', description: defaultAddress },
+      { id: 'change', title: 'Change Address', description: 'Update block or room' },
+      { id: 'back', title: 'Back', description: 'Return to packaging' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, promptMsg, buttons);
@@ -1271,14 +1279,18 @@ export class BotEngine {
       session.step = 'MANUAL_HOSTEL';
       sessionManager.saveSession(session);
 
-      let msg = `🏠 *Select Your Delivery Hostel:*\n\n`;
+      let msg = `*Select Your Delivery Hostel:*\n\n`;
       CAMPUS_HOSTELS.forEach((h, i) => {
-        msg += `${i + 1}️⃣ *${h}*\n`;
+        msg += `${i + 1}. ${h}\n`;
       });
-      msg += `\n_Reply with the number (1-5) or type your hostel name._`;
+      msg += `\nReply with the number (1-5) or type your hostel name:`;
 
-      const buttons = CAMPUS_HOSTELS.map((h, i) => ({ id: String(i + 1), title: h }));
-      buttons.push({ id: 'back', title: '🔙 Back' });
+      const buttons: InteractiveOption[] = CAMPUS_HOSTELS.map((h, i) => ({
+        id: String(i + 1),
+        title: `${i + 1}. ${h}`,
+        description: 'Hostel delivery block',
+      }));
+      buttons.push({ id: 'back', title: 'Back', description: 'Cancel change' });
 
       await ChannelService.sendQuickReplyButtons(session, msg, buttons);
       return 'Prompted Manual Hostel';
@@ -1303,16 +1315,16 @@ export class BotEngine {
     sessionManager.saveSession(session);
 
     const msg =
-      `🛵 *Hostel Drop-Off Instruction:*\n\n` +
-      `Where would you like to receive your meal from your dispatch rider?\n\n` +
-      `1️⃣ *Meet at Hostel Porter's Lodge / Gate* (Recommended for speed & security)\n` +
-      `2️⃣ *Deliver to Room Door* (${session.room || 'Room'})\n\n` +
-      `_Reply 1 or 2 or tap below:_`;
+      `*Hostel Drop-Off Instruction:*\n\n` +
+      `Where would you like to receive your meal?\n\n` +
+      `1. *Hostel Porter's Lodge / Gate* (Fastest)\n` +
+      `2. *Deliver to Room Door* (${session.room || 'Room'})\n\n` +
+      `Reply 1 or 2, or choose below:`;
 
-    const buttons = [
-      { id: 'gate', title: "🏢 Porter's Lodge / Gate" },
-      { id: 'room', title: '🚪 Room Door' },
-      { id: 'back', title: '🔙 Back' },
+    const buttons: InteractiveOption[] = [
+      { id: 'gate', title: "Porter's Lodge / Gate", description: 'Meet rider at gate' },
+      { id: 'room', title: 'Room Door', description: 'Delivered directly to room' },
+      { id: 'back', title: 'Back', description: 'Change location' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, msg, buttons);
@@ -1350,7 +1362,7 @@ export class BotEngine {
 
     await ChannelService.sendMessage(
       session,
-      `📍 Selected: *${session.hostel}*\n\nWhat is your room number? (e.g. *Room 214*)`
+      `Selected: *${session.hostel}*\n\nWhat is your room number? (e.g. *Room 214*)`
     );
     return 'Awaiting Manual Room';
   }
@@ -1414,33 +1426,30 @@ export class BotEngine {
       const totalAmount = data.total_amount_ngn || data.total_amount || 0;
 
       const summary =
-        `🎉 *Order Created (#${data.order_number})*\n\n` +
-        `🏪 Kitchen(s): *${vendorNames}*\n` +
-        `📍 Delivery to: *${session.hostel || 'Hostel Block C'}, ${session.room || 'Room 214'}*\n` +
-        `🛵 Handoff: *${session.pendingOrder.dropPreference}*\n\n` +
-        `🍲 Food Subtotal: *₦${foodSubtotal.toLocaleString()}*\n` +
-        `📦 Packaging Fee (${totalContainers} packs): *₦${packagingFee.toLocaleString()}*\n` +
-        `🛵 Campus Dispatch: *₦${deliveryFee.toLocaleString()}*\n` +
-        `⚙️ Service Fee: *₦${serviceFee.toLocaleString()}*\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `💰 *TOTAL DUE: ₦${totalAmount.toLocaleString()}*\n\n` +
-        `💳 *Accepted Methods:* Bank Transfer, USSD, Debit Card\n` +
-        `⏱️ *Meal Reservation:* Active for 15 minutes\n\n` +
-        `🔒 *Click below to complete secure payment:* \n` +
-        `👉 ${data.payment_url || data.checkout_url}\n\n` +
-        `🔑 *Delivery PIN Note:*\n` +
-        `Your secret 4-digit Delivery PIN will be unlocked and sent to you automatically as soon as payment is confirmed.`;
+        `*Order Created (#${data.order_number})*\n\n` +
+        `• Kitchen: ${vendorNames}\n` +
+        `• Drop-off: ${session.hostel || 'Hostel Block C'}, ${session.room || 'Room 214'}\n` +
+        `• Handoff: ${session.pendingOrder.dropPreference}\n\n` +
+        `Food Subtotal: ₦${foodSubtotal.toLocaleString()}\n` +
+        `Packaging (${totalContainers} packs): ₦${packagingFee.toLocaleString()}\n` +
+        `Delivery: ₦${deliveryFee.toLocaleString()}\n` +
+        `Service Fee: ₦${serviceFee.toLocaleString()}\n` +
+        `--------------------\n` +
+        `Total: *₦${totalAmount.toLocaleString()}*\n\n` +
+        `Accepted: Bank Transfer, USSD, Debit Card\n` +
+        `Payment Link:\n${data.payment_url || data.checkout_url}\n\n` +
+        `Note: Your 4-digit Delivery PIN will be unlocked and sent to you automatically once payment is confirmed. Type */pin* anytime to view it.`;
 
-      const buttons = [
-        { id: 'modify', title: '✏️ Modify Tray' },
-        { id: 'track', title: '📍 Track Payment' },
-        { id: 'menu', title: '🏠 Main Menu' },
+      const buttons: InteractiveOption[] = [
+        { id: 'modify', title: 'Modify Tray', description: 'Adjust items before paying' },
+        { id: 'track', title: 'Track Payment', description: 'Check payment status' },
+        { id: 'menu', title: 'Main Menu', description: 'Return home' },
       ];
 
       await ChannelService.sendQuickReplyButtons(session, summary, buttons);
       return 'Checkout created';
     } catch (err: any) {
-      await ChannelService.sendMessage(session, `⚠️ Checkout error: ${err.message}`);
+      await ChannelService.sendMessage(session, `Checkout error: ${err.message}`);
       return 'Checkout error';
     }
   }
@@ -1454,7 +1463,7 @@ export class BotEngine {
       session.pendingOrder = undefined;
       session.step = 'VIEWING_CART';
       sessionManager.saveSession(session);
-      await ChannelService.sendMessage(session, '🔄 Order reopened! You can now adjust portions, remove items, or add more dishes.');
+      await ChannelService.sendMessage(session, 'Order reopened. You can now adjust portions, remove items, or add more dishes.');
       return this.displayCart(session);
     }
     return this.displayCart(session);
@@ -1479,19 +1488,67 @@ export class BotEngine {
     sessionManager.saveSession(session);
 
     const notification =
-      `🎉 *Payment Confirmed! (Order #${details.orderNumber})*\n\n` +
-      `👨‍🍳 *${details.restaurantName}* has received your order and kitchen preparation has started.\n\n` +
-      `🔑 *YOUR SECRET DELIVERY PIN: ${details.deliveryPin}*\n` +
-      `_(Keep this safe! Only provide this PIN to your rider when they hand you your food.)_\n\n` +
-      `⚡ *15-Minute Campus Dispatch Active.*\n` +
-      `Reply */track* anytime to see live delivery updates!`;
+      `*Payment Confirmed (Order #${details.orderNumber})*\n\n` +
+      `Kitchen: *${details.restaurantName}* has begun preparing your meal.\n\n` +
+      `*Delivery PIN:* *${details.deliveryPin}*\n` +
+      `Give this 4-digit PIN to your rider upon arrival.\n\n` +
+      `Estimated delivery: 15 minutes.\n` +
+      `Reply */track* for live updates.`;
 
-    const buttons = [
-      { id: 'track', title: '📍 Track Rider' },
-      { id: 'help', title: '📞 Support' },
+    const buttons: InteractiveOption[] = [
+      { id: 'track', title: 'Track Rider', description: 'Live delivery status' },
+      { id: 'help', title: 'Support', description: 'Help with this order' },
     ];
 
     return ChannelService.sendQuickReplyButtons(session, notification, buttons);
+  }
+
+  // ==========================================
+  // QUICK PIN LOOKUP (/pin)
+  // ==========================================
+
+  private static async handleQuickPinLookup(session: UserSession): Promise<string> {
+    try {
+      const searchPhone = session.realPhone || session.phone;
+      const res = await CentralApiClient.getActiveOrder(searchPhone);
+      const order = res.data;
+
+      if (order && order.delivery_pin) {
+        if (order.status === 'awaiting_payment' || order.status === 'pending_payment') {
+          await ChannelService.sendMessage(
+            session,
+            `*Delivery PIN:* Locked\n\nYour 4-digit PIN will be unlocked immediately once payment is confirmed.`
+          );
+          return 'PIN locked';
+        }
+
+        await ChannelService.sendMessage(
+          session,
+          `*Delivery PIN:* *${order.delivery_pin}*\n\nProvide this 4-digit PIN to your rider when receiving order #${order.order_number}.`
+        );
+        return 'PIN retrieved';
+      }
+
+      if (session.pendingOrder?.deliveryPin) {
+        await ChannelService.sendMessage(
+          session,
+          `*Delivery PIN:* Locked\n\nYour order #${session.pendingOrder.orderNumber} is awaiting payment. Once paid, your PIN is unlocked.`
+        );
+        return 'PIN locked';
+      }
+
+      await ChannelService.sendMessage(
+        session,
+        `No active orders found. Your 4-digit Delivery PIN appears automatically when you place an order.`
+      );
+      return 'No active PIN';
+    } catch {
+      await ChannelService.sendMessage(
+        session,
+        `No active orders found. Your 4-digit Delivery PIN appears automatically when you place an order.`
+      );
+      return 'No active PIN';
+    }
   }
 
   // ==========================================
@@ -1508,17 +1565,17 @@ export class BotEngine {
         if (session.pendingOrder) {
           const po = session.pendingOrder;
           const msg =
-            `📍 *Order Tracking (#${po.orderNumber})*\n\n` +
-            `Status: *⏳ Awaiting Payment*\n` +
+            `*Order Tracking (#${po.orderNumber})*\n\n` +
+            `Status: *Awaiting Payment*\n` +
             `Kitchen: *${po.restaurantName}*\n` +
             `Total: *₦${po.totalNgn.toLocaleString()}*\n\n` +
-            `👉 *Click to pay:* ${po.checkoutUrl}\n\n` +
-            `_Your delivery PIN will unlock automatically once paid._`;
+            `Payment link:\n${po.checkoutUrl}\n\n` +
+            `Your delivery PIN will unlock automatically once paid.`;
 
-          const buttons = [
-            { id: 'modify', title: '✏️ Modify Tray' },
-            { id: 'track', title: '🔄 Refresh Status' },
-            { id: 'menu', title: '🏠 Main Menu' },
+          const buttons: InteractiveOption[] = [
+            { id: 'modify', title: 'Modify Tray', description: 'Adjust order items' },
+            { id: 'track', title: 'Refresh Status', description: 'Check payment update' },
+            { id: 'menu', title: 'Main Menu', description: 'Return home' },
           ];
           await ChannelService.sendQuickReplyButtons(session, msg, buttons);
           return 'Pending payment tracked';
@@ -1526,64 +1583,63 @@ export class BotEngine {
 
         await ChannelService.sendMessage(
           session,
-          `ℹ️ No active delivery found for this account.\nReply *1* to browse campus restaurants and start a new order!`
+          `No active delivery found for this account.\nReply *1* to browse campus restaurants and start a new order.`
         );
         return 'No active order';
       }
 
-      const statusMap: Record<string, { label: string; icon: string; step: string; eta: string }> = {
-        awaiting_payment: { label: 'Awaiting Payment', icon: '⏳', step: '1/4 [💳 Pay] ➔ [🍳 Prep] ➔ [🛵 Transit] ➔ [✅ Delivered]', eta: 'Pending confirmation' },
-        pending_payment: { label: 'Awaiting Payment', icon: '⏳', step: '1/4 [💳 Pay] ➔ [🍳 Prep] ➔ [🛵 Transit] ➔ [✅ Delivered]', eta: 'Pending confirmation' },
-        paid: { label: 'Payment Confirmed — Sent to Kitchen', icon: '💳', step: '2/4 [✅ Paid] ➔ [🍳 Prep] ➔ [🛵 Transit] ➔ [✅ Delivered]', eta: '~12-15 mins' },
-        vendor_accepted: { label: 'Kitchen Accepted & Preparing', icon: '👨‍🍳', step: '2/4 [✅ Paid] ➔ [🍳 Cooking] ➔ [🛵 Transit] ➔ [✅ Delivered]', eta: '~10-14 mins' },
-        preparing: { label: 'Meal is being Cooked', icon: '🔥', step: '2/4 [✅ Paid] ➔ [🔥 Cooking] ➔ [🛵 Transit] ➔ [✅ Delivered]', eta: '~8-12 mins' },
-        ready_for_pickup: { label: 'Packaged & Ready for Rider Pickup', icon: '📦', step: '3/4 [✅ Paid] ➔ [✅ Cooked] ➔ [📦 Pickup] ➔ [✅ Delivered]', eta: '~7-10 mins' },
-        rider_assigned: { label: 'Rider Assigned & Heading to Vendor', icon: '🛵', step: '3/4 [✅ Paid] ➔ [✅ Cooked] ➔ [🛵 Dispatched] ➔ [✅ Delivered]', eta: '~5-8 mins' },
-        in_transit: { label: 'Rider in Transit to your Hostel', icon: '🚀', step: '3/4 [✅ Paid] ➔ [✅ Cooked] ➔ [🚀 On the Way] ➔ [✅ Delivered]', eta: '~3-6 mins' },
-        delivered: { label: 'Successfully Delivered', icon: '✅', step: '4/4 [✅ Paid] ➔ [✅ Cooked] ➔ [✅ Dispatched] ➔ [✅ Delivered]', eta: 'Completed' },
+      const statusMap: Record<string, { label: string; step: string; eta: string }> = {
+        awaiting_payment: { label: 'Awaiting Payment', step: '[Pay] -> [Prep] -> [Transit] -> [Delivered]', eta: 'Pending confirmation' },
+        pending_payment: { label: 'Awaiting Payment', step: '[Pay] -> [Prep] -> [Transit] -> [Delivered]', eta: 'Pending confirmation' },
+        paid: { label: 'Payment Confirmed — Sent to Kitchen', step: '[Done: Pay] -> [Cooking] -> [Transit] -> [Delivered]', eta: '~12-15 mins' },
+        vendor_accepted: { label: 'Kitchen Accepted & Preparing', step: '[Done: Pay] -> [Cooking] -> [Transit] -> [Delivered]', eta: '~10-14 mins' },
+        preparing: { label: 'Meal is being Prepared', step: '[Done: Pay] -> [Cooking] -> [Transit] -> [Delivered]', eta: '~8-12 mins' },
+        ready_for_pickup: { label: 'Packaged & Ready for Rider Pickup', step: '[Done: Cooked] -> [Pickup] -> [Delivered]', eta: '~7-10 mins' },
+        rider_assigned: { label: 'Rider Assigned to Pickup', step: '[Done: Cooked] -> [Dispatched] -> [Delivered]', eta: '~5-8 mins' },
+        in_transit: { label: 'Rider in Transit to Hostel', step: '[Done: Cooked] -> [On the Way] -> [Delivered]', eta: '~3-6 mins' },
+        delivered: { label: 'Delivered', step: '[Completed]', eta: 'Completed' },
       };
 
       const info = statusMap[order.status] || {
         label: order.status,
-        icon: 'ℹ️',
         step: '[Active Delivery]',
         eta: '~10 mins',
       };
 
-      let pinText = `🔑 *Delivery PIN:* Hidden until payment is completed`;
+      let pinText = `Delivery PIN: Hidden until payment is completed`;
       if (order.status !== 'awaiting_payment' && order.status !== 'pending_payment') {
-        pinText = `🔑 *Delivery PIN: ${order.delivery_pin}*\n_(Give this PIN to your rider when they hand you your meal.)_`;
+        pinText = `Delivery PIN: *${order.delivery_pin}*\n(Give this PIN to your rider upon arrival)`;
       }
 
       const isDelivered = order.status === 'delivered';
 
       const trackerMsg =
-        `📍 *Active Order Tracking (#${order.order_number})*\n\n` +
-        `Status: *${info.icon} ${info.label}*\n` +
-        `Progress: *${info.step}*\n` +
-        `⏱️ *Estimated Arrival:* ${info.eta}\n\n` +
-        `🏪 Vendor: *${order.restaurant_name}*\n` +
-        `📍 Drop-off: *${order.delivery_location || order.hostel + ', ' + order.room}*\n` +
-        `💰 Total: *₦${(order.total_amount_ngn || order.total_amount || 0).toLocaleString()}*\n\n` +
+        `*Order Tracking (#${order.order_number})*\n\n` +
+        `• Status: *${info.label}*\n` +
+        `• Progress: ${info.step}\n` +
+        `• Estimated Arrival: ${info.eta}\n\n` +
+        `• Kitchen: ${order.restaurant_name}\n` +
+        `• Drop-off: ${order.delivery_location || order.hostel + ', ' + order.room}\n` +
+        `• Total: ₦${(order.total_amount_ngn || order.total_amount || 0).toLocaleString()}\n\n` +
         `${pinText}`;
 
-      const buttons = [];
+      const buttons: InteractiveOption[] = [];
       if (isDelivered) {
-        buttons.push({ id: 'reorder', title: '🔄 Reorder Meal' });
-        buttons.push({ id: 'help', title: '⭐ Rate or Report Issue' });
-        buttons.push({ id: 'menu', title: '🏠 Main Menu' });
+        buttons.push({ id: 'reorder', title: 'Reorder Meal', description: 'Order again from kitchen' });
+        buttons.push({ id: 'help', title: 'Report Issue', description: 'Get support assistance' });
+        buttons.push({ id: 'menu', title: 'Main Menu', description: 'Return home' });
       } else {
-        buttons.push({ id: 'track', title: '🔄 Refresh Status' });
-        buttons.push({ id: 'help', title: '📞 Need Help?' });
-        buttons.push({ id: 'menu', title: '🏠 Main Menu' });
+        buttons.push({ id: 'track', title: 'Refresh Status', description: 'Get latest update' });
+        buttons.push({ id: 'help', title: 'Support', description: 'Need help with delivery' });
+        buttons.push({ id: 'menu', title: 'Main Menu', description: 'Return home' });
       }
 
       await ChannelService.sendQuickReplyButtons(session, trackerMsg, buttons);
       return 'Order tracked';
-    } catch (err: any) {
+    } catch {
       await ChannelService.sendMessage(
         session,
-        `ℹ️ No active delivery found for this account.\nReply *1* to start a new order!`
+        `No active delivery found for this account.\nReply *1* to start a new order.`
       );
       return 'No active order';
     }
@@ -1591,18 +1647,17 @@ export class BotEngine {
 
   private static async handleSupport(session: UserSession): Promise<string> {
     const supportMsg =
-      `📞 *EU Bite Campus Support*\n\n` +
-      `Need help with a late meal, payment verification, or eco-pack deposit return?\n\n` +
-      `• Campus Hotline: *+234 800 382 4837 (EU-BITE)*\n` +
-      `• WhatsApp Support: *+234 800 382 4837*\n` +
-      `• Telegram Support: *@eubite_support*\n` +
-      `• Operating Hours: *8:00 AM – 10:30 PM Daily*\n\n` +
+      `*EU Bite Support*\n\n` +
+      `Need help with a meal, payment verification, or eco-pack deposit return?\n\n` +
+      `• Hotline / WhatsApp: +234 800 382 4837\n` +
+      `• Telegram: @eubite_support\n` +
+      `• Operating Hours: 8:00 AM – 10:30 PM Daily\n\n` +
       `Reply *menu* to return to the main menu.`;
 
-    const buttons = [
-      { id: '1', title: '🍽️ Restaurants' },
-      { id: 'track', title: '📍 Track Order' },
-      { id: 'menu', title: '🏠 Main Menu' },
+    const buttons: InteractiveOption[] = [
+      { id: '1', title: 'Restaurants', description: 'Browse open kitchens' },
+      { id: 'track', title: 'Track Order', description: 'Live delivery status' },
+      { id: 'menu', title: 'Main Menu', description: 'Return home' },
     ];
 
     await ChannelService.sendQuickReplyButtons(session, supportMsg, buttons);

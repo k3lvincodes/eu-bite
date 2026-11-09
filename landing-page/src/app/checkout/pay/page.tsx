@@ -104,19 +104,19 @@ function CheckoutPayContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#272D2F] flex items-center justify-center p-4">
       <Script src="https://web.alatpay.ng/js/alatpay.js" strategy="lazyOnload" />
-      <div className="max-w-md w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-700">
+      <div className="max-w-md w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-[#D7D7D7]">
         {/* ALATPay by Wema Header */}
-        <div className="bg-[#A90836] p-6 text-white flex items-center justify-between">
+        <div className="bg-[#FE724C] p-6 text-white flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5 font-black text-sm tracking-tight">
               <span>ALATPay</span>
-              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">BY WEMA BANK</span>
+              <span className="text-[10px] bg-[#FFC529] text-[#272D2F] px-2 py-0.5 rounded-full font-bold">BY WEMA BANK</span>
             </div>
-            <p className="text-xs font-semibold text-rose-100 mt-0.5">EU Bite Campus Food Order</p>
+            <p className="text-xs font-semibold text-white/90 mt-0.5">EU Bite Campus Food Order</p>
           </div>
-          <Lock className="w-5 h-5 text-rose-100" />
+          <Lock className="w-5 h-5 text-white" />
         </div>
 
         {/* Content */}
@@ -143,7 +143,7 @@ function CheckoutPayContent() {
                 onClick={() => setPaymentMethod('card')}
                 className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                   paymentMethod === 'card'
-                    ? 'border-[#A90836] bg-rose-50/60 text-slate-900 ring-2 ring-[#A90836]/20'
+                    ? 'border-[#FE724C] bg-[#FFC529]/20 text-[#272D2F] ring-2 ring-[#FE724C]/20'
                     : 'border-slate-200 text-slate-600'
                 }`}
               >
@@ -155,7 +155,7 @@ function CheckoutPayContent() {
                 onClick={() => setPaymentMethod('transfer')}
                 className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                   paymentMethod === 'transfer'
-                    ? 'border-[#A90836] bg-rose-50/60 text-slate-900 ring-2 ring-[#A90836]/20'
+                    ? 'border-[#FE724C] bg-[#FFC529]/20 text-[#272D2F] ring-2 ring-[#FE724C]/20'
                     : 'border-slate-200 text-slate-600'
                 }`}
               >
@@ -166,13 +166,13 @@ function CheckoutPayContent() {
           </div>
 
           {paymentMethod === 'transfer' && (
-            <div className="p-3.5 rounded-xl bg-rose-50/50 border border-rose-200 text-xs space-y-1.5">
+            <div className="p-3.5 rounded-xl bg-[#FFC529]/15 border border-[#FFC529] text-xs space-y-1.5">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Virtual Account (Wema Bank):</span>
                 <button
                   type="button"
                   onClick={handleCopyAccount}
-                  className="inline-flex items-center gap-1 font-sans font-bold text-[#A90836] hover:underline"
+                  className="inline-flex items-center gap-1 font-sans font-bold text-[#FE724C] hover:underline"
                 >
                   <span>{vaNumber}</span>
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -199,7 +199,7 @@ function CheckoutPayContent() {
           <button
             onClick={handleAlatPayPayment}
             disabled={processing}
-            className="w-full bg-[#A90836] hover:bg-[#8e062d] text-white font-black py-3.5 rounded-2xl text-xs transition-colors shadow-lg shadow-rose-900/20 disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full bg-[#FE724C] hover:bg-[#e55a35] text-white font-black py-3.5 rounded-2xl text-xs transition-colors shadow-lg shadow-[#FE724C]/25 disabled:opacity-60 flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
             <span>{processing ? 'Verifying with ALATPay...' : `Pay ₦${parseFloat(amount).toLocaleString()} via ALATPay`}</span>

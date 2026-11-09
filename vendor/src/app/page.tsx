@@ -426,13 +426,13 @@ export default function VendorDashboardPage() {
                     )}
 
                     {order.status === 'rider_assigned' && (
-                      <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+                      <span className="text-xs font-semibold text-[#272D2F] bg-[#FFC529]/30 px-3 py-1 rounded-lg border border-[#FFC529]">
                         Rider En Route to Pickup
                       </span>
                     )}
 
                     {order.status === 'in_transit' && (
-                      <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1 rounded-lg border border-purple-200">
+                      <span className="text-xs font-semibold text-[#FE724C] bg-[#FE724C]/10 px-3 py-1 rounded-lg border border-[#FE724C]/30">
                         In Transit to Student
                       </span>
                     )}

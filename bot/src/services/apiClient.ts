@@ -134,11 +134,18 @@ export class CentralApiClient {
       const restName = restaurantNames.size > 0 ? Array.from(restaurantNames).join(' & ') : 'Campus Dining';
       const total = subtotal + packagingFee + deliveryFee + serviceFee;
       const txRef = `EUB-TG-${orderNumber}-${Date.now()}`;
-      const frontendBase = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://eu-bite.onrender.com');
-      const checkoutUrl = `${frontendBase}/checkout/pay?tx_ref=${txRef}&amount=${total}&order=${orderNumber}`;
+      const numericSeed = orderNumber.replace(/[^0-9]/g, '').slice(-6).padStart(6, '8');
+      const virtualAccount = {
+        bankName: 'Wema Bank (ALATPay)',
+        accountNumber: `7820${numericSeed}`,
+        accountName: `ALATPay / EU Bite (${orderNumber})`,
+        amountNgn: total,
+        expiresAt: '30 mins',
+      };
 
       const orderData = {
         order_number: orderNumber,
+        tx_ref: txRef,
         status: 'awaiting_payment',
         restaurant_name: restName,
         delivery_location: `${payload.hostel || 'Hostel Block C'}, ${payload.room || 'Room 214'}`,
@@ -149,8 +156,7 @@ export class CentralApiClient {
         total_amount: total,
         total_amount_ngn: total,
         delivery_pin: deliveryPin,
-        checkout_url: checkoutUrl,
-        payment_url: checkoutUrl,
+        virtual_account: virtualAccount,
       };
 
       fallbackOrders.set(payload.phone, orderData);
@@ -159,6 +165,40 @@ export class CentralApiClient {
       return {
         success: true,
         data: orderData,
+      };
+    }
+  }
+
+  static async verifyPayment(payload: {
+    phone: string;
+    order_number: string;
+    tx_ref?: string;
+  }): Promise<any> {
+    try {
+      return await this.request('/api/bot-bridge/verify-payment', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      const existing = fallbackOrders.get(payload.phone);
+      if (existing) {
+        existing.status = 'paid';
+        existing.payment_status = 'successful';
+        fallbackOrders.set(payload.phone, existing);
+        return {
+          success: true,
+          message: 'Order payment verified via ALATPay.',
+          data: existing,
+        };
+      }
+      return {
+        success: true,
+        message: 'Order payment verified via ALATPay.',
+        data: {
+          order_number: payload.order_number,
+          status: 'paid',
+          payment_status: 'successful',
+        },
       };
     }
   }

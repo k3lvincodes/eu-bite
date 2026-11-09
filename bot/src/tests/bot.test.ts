@@ -138,6 +138,14 @@ describe('EU Bite Omnichannel Bot Conversational Flow Tests (WhatsApp & Telegram
       const trackResult = await BotEngine.handleIncomingMessage(testPhone, 'track', 'whatsapp');
       assert.strictEqual(trackResult, 'Order tracked');
     });
+
+    test('9. Confirming in-chat bank transfer payment via "confirm_payment" unlocks PIN', async () => {
+      const payResult = await BotEngine.handleIncomingMessage(testPhone, 'confirm_payment', 'whatsapp');
+      assert.strictEqual(payResult, 'Payment confirmed');
+      const session = sessionManager.getSession(testPhone);
+      assert.strictEqual(session.pendingOrder, undefined);
+      assert.strictEqual(session.step, 'MAIN_MENU');
+    });
   });
 
   // --- Telegram Channel Tests ---

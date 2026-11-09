@@ -2,20 +2,88 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Regular.woff2') format('woff2');
+  font-weight: 300 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Regular-Italic.woff2') format('woff2');
+  font-weight: 300 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Medium.woff2') format('woff2');
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Medium-Italic.woff2') format('woff2');
+  font-weight: 500 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Bold.woff2') format('woff2');
+  font-weight: 700 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Bold-Italic.woff2') format('woff2');
+  font-weight: 700 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Heavy.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'pinterest-sans';
+  src: url('/fonts/Pin-Sans-Heavy-Italic.woff2') format('woff2');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   --font-pinterest-sans: 'pinterest-sans';
+  --color-primary: #FE724C;
+  --color-secondary: #FFC529;
+  --color-dark: #272D2F;
+  --color-grey: #D7D7D7;
 }
 
 html {
-  font-family: 'pinterest-sans' !important;
+  font-family: var(--font-pinterest-sans), 'pinterest-sans' !important;
 }
 
 * {
-  font-family: 'pinterest-sans' !important;
+  font-family: var(--font-pinterest-sans), 'pinterest-sans' !important;
 }
 
 body {
-  font-family: 'pinterest-sans' !important;
-  color: #0f172a;
-  background-color: #f1f5f9;
+  font-family: var(--font-pinterest-sans), 'pinterest-sans' !important;
+  color: #272D2F;
+  background-color: #272D2F;
 }

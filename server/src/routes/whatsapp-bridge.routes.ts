@@ -290,7 +290,7 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
       db.orderItems.set(oItemId, itemRecord);
     }
 
-    const { paymentUrl } = await AlatPayService.createPaymentLink(order, user.full_name, user.email, user.phone);
+    const { paymentUrl, virtualAccount } = await AlatPayService.createPaymentLink(order, user.full_name, user.email, user.phone);
 
     res.json({
       success: true,
@@ -305,10 +305,51 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
         payment_url: paymentUrl,
         tx_ref: txRef,
         delivery_pin: deliveryPin,
+        virtual_account: virtualAccount,
       },
     });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message || 'WhatsApp checkout error' });
+  }
+});
+
+// 4. Confirm/Verify student in-chat bank transfer payment via ALATPay
+router.post('/verify-payment', async (req: any, res: any): Promise<void> => {
+  try {
+    const { order_number, tx_ref } = req.body;
+    const reference = tx_ref || order_number;
+
+    if (!reference) {
+      res.status(400).json({ success: false, error: 'Order number or transaction reference is required.' });
+      return;
+    }
+
+    const result = await AlatPayService.processPaymentVerification(reference, undefined, 'successful');
+    if (!result.verified && result.status !== 'successful') {
+      res.status(400).json({ success: false, error: result.message });
+      return;
+    }
+
+    let order: any = null;
+    for (const o of db.orders.values()) {
+      if (o.alatpay_tx_ref === reference || o.order_number === reference) {
+        const rest = db.restaurants.get(o.restaurant_id);
+        order = {
+          ...o,
+          restaurant_name: rest?.name || 'Campus Kitchen',
+          total_amount_ngn: o.total_amount_kobo / 100,
+        };
+        break;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: result.message,
+      data: order,
+    });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message || 'Payment verification error' });
   }
 });
 

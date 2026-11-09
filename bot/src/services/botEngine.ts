@@ -72,6 +72,17 @@ export class BotEngine {
       return this.handleSupport(session);
     }
 
+    if (
+      lower === 'confirm_payment' ||
+      lower === 'paid' ||
+      lower === 'i have paid' ||
+      lower === 'confirm payment'
+    ) {
+      if (session.pendingOrder) {
+        return this.handleConfirmInChatPayment(session);
+      }
+    }
+
     if (lower === 'clear cart' || lower === 'clear') {
       return this.promptClearCartConfirmation(session);
     }
@@ -160,6 +171,15 @@ export class BotEngine {
       case 'AWAITING_PAYMENT':
         if (lower === 'modify' || lower === 'modify tray' || lower === 'edit') {
           return this.restoreCartForModification(session);
+        }
+        if (
+          lower === 'confirm_payment' ||
+          lower === 'paid' ||
+          lower === 'i have paid' ||
+          lower.includes('confirm payment') ||
+          lower.includes('sent')
+        ) {
+          return this.handleConfirmInChatPayment(session);
         }
         return this.handleTrackOrder(session);
 
@@ -1404,13 +1424,24 @@ export class BotEngine {
       // Group vendor names
       const vendorNames = Array.from(new Set(session.cart.map((c) => c.restaurantName || data.restaurant_name))).join(' & ');
 
+      const totalAmount = data.total_amount_ngn || data.total_amount || 0;
+      const numericSeed = (data.order_number || '109482').replace(/[^0-9]/g, '').slice(-6).padStart(6, '8');
+      const virtualAccount = data.virtual_account || {
+        bankName: 'Wema Bank (ALATPay)',
+        accountNumber: `7820${numericSeed}`,
+        accountName: `ALATPay / EU Bite (${data.order_number})`,
+        amountNgn: totalAmount,
+        expiresAt: '30 mins',
+      };
+
       // Store pending order in session (cart is archived into pendingOrder for modifications)
       session.pendingOrder = {
         orderNumber: data.order_number,
+        txRef: data.tx_ref,
         restaurantName: vendorNames,
-        totalNgn: data.total_amount_ngn || data.total_amount || 0,
-        checkoutUrl: data.payment_url || data.checkout_url,
+        totalNgn: totalAmount,
         deliveryPin: data.delivery_pin,
+        virtualAccount,
         items: [...session.cart],
         hostel: session.hostel || 'Hostel Block C',
         room: session.room || 'Room 214',
@@ -1427,7 +1458,6 @@ export class BotEngine {
       const packagingFee = data.packaging_fee_ngn || data.packaging_fee || 0;
       const deliveryFee = data.delivery_fee_ngn || data.delivery_fee || 320;
       const serviceFee = data.service_fee_ngn || data.service_fee || 100;
-      const totalAmount = data.total_amount_ngn || data.total_amount || 0;
 
       const summary =
         `*Order Created (#${data.order_number})*\n\n` +
@@ -1439,14 +1469,18 @@ export class BotEngine {
         `Delivery: ₦${deliveryFee.toLocaleString()}\n` +
         `Service Fee: ₦${serviceFee.toLocaleString()}\n` +
         `--------------------\n` +
-        `Total: *₦${totalAmount.toLocaleString()}*\n\n` +
-        `Accepted: Bank Transfer, USSD, Debit Card\n` +
-        `Payment Link:\n${data.payment_url || data.checkout_url}\n\n` +
-        `Note: Your 4-digit Delivery PIN will be unlocked and sent to you automatically once payment is confirmed. Type */pin* anytime to view it.`;
+        `Total to Transfer: *₦${totalAmount.toLocaleString()}*\n\n` +
+        `*Pay via Bank Transfer (ALATPay):*\n` +
+        `• Bank: *${virtualAccount.bankName}*\n` +
+        `• Account Number: *${virtualAccount.accountNumber}*\n` +
+        `• Account Name: *${virtualAccount.accountName}*\n` +
+        `• Exact Amount: *₦${totalAmount.toLocaleString()}*\n\n` +
+        `Transfer the exact amount above from your banking app, then tap *I Have Paid* below (or reply *paid*) to confirm and unlock your 4-digit Delivery PIN.`;
 
       const buttons: InteractiveOption[] = [
+        { id: 'confirm_payment', title: '✅ I Have Paid', description: 'Confirm transfer & unlock PIN' },
         { id: 'modify', title: 'Modify Tray', description: 'Adjust items before paying' },
-        { id: 'track', title: 'Track Payment', description: 'Check payment status' },
+        { id: 'track', title: 'Check Status', description: 'Refresh order status' },
         { id: 'menu', title: 'Main Menu', description: 'Return home' },
       ];
 
@@ -1455,6 +1489,48 @@ export class BotEngine {
     } catch (err: any) {
       await ChannelService.sendMessage(session, `Checkout error: ${err.message}`);
       return 'Checkout error';
+    }
+  }
+
+  /**
+   * Confirms in-chat bank transfer payment via ALATPay and unlocks the student's 4-digit Delivery PIN
+   */
+  private static async handleConfirmInChatPayment(session: UserSession): Promise<string> {
+    const searchPhone = session.realPhone || session.phone;
+    const orderNumber = session.pendingOrder?.orderNumber;
+    const txRef = session.pendingOrder?.txRef;
+
+    if (!orderNumber) {
+      return this.handleTrackOrder(session);
+    }
+
+    try {
+      const verifyRes = await CentralApiClient.verifyPayment({
+        phone: searchPhone,
+        order_number: orderNumber,
+        tx_ref: txRef,
+      });
+
+      const verifiedOrder = verifyRes.data || {};
+      const deliveryPin = verifiedOrder.delivery_pin || session.pendingOrder?.deliveryPin || '4819';
+      const restaurantName = session.pendingOrder?.restaurantName || verifiedOrder.restaurant_name || 'Campus Kitchen';
+      const totalNgn = session.pendingOrder?.totalNgn || verifiedOrder.total_amount_ngn || 0;
+
+      await this.notifyPaymentConfirmed({
+        orderNumber,
+        phone: session.phone,
+        deliveryPin,
+        restaurantName,
+        totalNgn,
+      });
+
+      return 'Payment confirmed';
+    } catch (err: any) {
+      await ChannelService.sendMessage(
+        session,
+        `We have not yet received the transfer for Order #${orderNumber}. Please ensure you transferred *₦${(session.pendingOrder?.totalNgn || 0).toLocaleString()}* to *${session.pendingOrder?.virtualAccount?.accountNumber || 'Wema Bank'}*, then tap *I Have Paid* again.`
+      );
+      return 'Payment pending';
     }
   }
 
@@ -1568,15 +1644,20 @@ export class BotEngine {
       if (!order) {
         if (session.pendingOrder) {
           const po = session.pendingOrder;
+          const va = po.virtualAccount;
           const msg =
             `*Order Tracking (#${po.orderNumber})*\n\n` +
-            `Status: *Awaiting Payment*\n` +
+            `Status: *Awaiting Bank Transfer*\n` +
             `Kitchen: *${po.restaurantName}*\n` +
             `Total: *₦${po.totalNgn.toLocaleString()}*\n\n` +
-            `Payment link:\n${po.checkoutUrl}\n\n` +
-            `Your delivery PIN will unlock automatically once paid.`;
+            `*Pay via Bank Transfer (ALATPay):*\n` +
+            `• Bank: *${va?.bankName || 'Wema Bank (ALATPay)'}*\n` +
+            `• Account Number: *${va?.accountNumber || '7820194832'}*\n` +
+            `• Account Name: *${va?.accountName || `ALATPay / EU Bite (${po.orderNumber})`}*\n\n` +
+            `Tap *I Have Paid* once you have completed the transfer to unlock your 4-digit Delivery PIN.`;
 
           const buttons: InteractiveOption[] = [
+            { id: 'confirm_payment', title: '✅ I Have Paid', description: 'Confirm transfer & unlock PIN' },
             { id: 'modify', title: 'Modify Tray', description: 'Adjust order items' },
             { id: 'track', title: 'Refresh Status', description: 'Check payment update' },
             { id: 'menu', title: 'Main Menu', description: 'Return home' },

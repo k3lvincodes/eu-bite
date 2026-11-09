@@ -3,45 +3,45 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, ShieldCheck, ArrowRight, UtensilsCrossed } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
-  const orderNumber = searchParams.get('orderNumber') || 'EUB-202610-101';
+  const orderNumber = searchParams.get('orderNumber') || 'EUB-202611-101';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-slate-200 text-center space-y-6">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+    <div className="min-h-screen bg-[#FAFAFA] text-[#272D2F] flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-[#D7D7D7] text-center space-y-6">
+        <div className="w-16 h-16 rounded-full bg-[#FFC529]/30 text-[#FE724C] flex items-center justify-center mx-auto">
           <CheckCircle2 className="w-10 h-10" />
         </div>
 
         <div>
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full uppercase tracking-wider">
+          <span className="text-[11px] font-bold text-[#272D2F] bg-[#FFC529] px-3 py-1 rounded-full uppercase tracking-wider">
             Payment Verified
           </span>
-          <h1 className="text-2xl font-black text-slate-900 mt-3">Order Confirmed!</h1>
-          <p className="text-xs text-slate-500 mt-1">Order #{orderNumber} has been received by the kitchen.</p>
+          <h1 className="text-2xl font-black text-[#272D2F] mt-3">Order Confirmed!</h1>
+          <p className="text-xs text-[#272D2F]/65 mt-1">Order #{orderNumber} has been sent to the kitchen.</p>
         </div>
 
         {/* PIN Box */}
-        <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-2">
-          <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 font-bold uppercase tracking-wider">
+        <div className="p-5 rounded-2xl bg-[#272D2F] text-white space-y-2">
+          <div className="flex items-center justify-center gap-1.5 text-xs text-[#FFC529] font-bold uppercase tracking-wider">
             <ShieldCheck className="w-4 h-4" />
             <span>Delivery Verification PIN</span>
           </div>
-          <p className="text-3xl font-black tracking-widest font-sans text-emerald-400">
-            Available in Tracker
+          <p className="text-2xl font-black tracking-wider text-white">
+            Unlocked in Tracker & Chat
           </p>
-          <p className="text-[11px] text-slate-400 leading-tight">
-            Hand this 4-digit code to your rider only after receiving your package at your hostel.
+          <p className="text-[11px] text-[#D7D7D7] leading-tight">
+            Share your 4-digit code with your rider only when receiving your meal at your hostel.
           </p>
         </div>
 
         <div className="space-y-3 pt-2">
           <Link
             href={`/track?orderNumber=${orderNumber}`}
-            className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition-colors shadow-md shadow-emerald-600/20"
+            className="w-full inline-flex items-center justify-center gap-2 bg-[#FE724C] hover:bg-[#e55a35] text-white font-bold py-3.5 rounded-2xl text-xs transition-colors shadow-md shadow-[#FE724C]/20"
           >
             <span>Track Order & View PIN</span>
             <ArrowRight className="w-4 h-4" />
@@ -49,7 +49,7 @@ function ConfirmationContent() {
 
           <Link
             href="/"
-            className="w-full inline-flex items-center justify-center text-slate-600 hover:text-slate-900 font-semibold py-2 text-xs transition-colors"
+            className="w-full inline-flex items-center justify-center text-[#272D2F]/70 hover:text-[#272D2F] font-bold py-2 text-xs transition-colors"
           >
             Return to Campus Home
           </Link>
@@ -61,7 +61,7 @@ function ConfirmationContent() {
 
 export default function OrderConfirmationPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-slate-500">Loading confirmation...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[#272D2F]/60">Loading confirmation...</div>}>
       <ConfirmationContent />
     </Suspense>
   );

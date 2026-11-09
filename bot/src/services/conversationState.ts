@@ -42,10 +42,18 @@ export type ConversationStep =
 
 export interface PendingOrder {
   orderNumber: string;
+  txRef?: string;
   restaurantName: string;
   totalNgn: number;
-  checkoutUrl: string;
+  checkoutUrl?: string;
   deliveryPin: string;
+  virtualAccount?: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+    amountNgn?: number;
+    expiresAt?: string;
+  };
   items: CartItem[];
   hostel: string;
   room: string;

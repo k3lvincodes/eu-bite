@@ -81,6 +81,7 @@ export interface UserSession {
   cart: CartItem[];
   selectedPackaging?: 'reusable' | 'school';
   pendingOrder?: PendingOrder;
+  lastActiveOrder?: PendingOrder & { status?: string };
   helpReturnStep?: ConversationStep;
   lastActivity: number;
 }

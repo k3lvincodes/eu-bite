@@ -90,9 +90,7 @@ export class BotEngine {
       lower === 'i have paid' ||
       lower === 'confirm payment'
     ) {
-      if (session.pendingOrder) {
-        return this.handleConfirmInChatPayment(session);
-      }
+      return this.handleConfirmInChatPayment(session);
     }
 
     if (lower === 'clear cart' || lower === 'clear') {
@@ -1509,7 +1507,7 @@ export class BotEngine {
       };
 
       // Store pending order in session (cart is archived into pendingOrder for modifications)
-      session.pendingOrder = {
+      const pendingOrderRecord = {
         orderNumber: data.order_number,
         txRef: data.tx_ref,
         restaurantName: vendorNames,
@@ -1523,6 +1521,8 @@ export class BotEngine {
         packagingCount: totalContainers,
         createdAt: Date.now(),
       };
+      session.pendingOrder = pendingOrderRecord;
+      session.lastActiveOrder = { ...pendingOrderRecord, status: 'pending_payment' };
 
       session.cart = [];
       session.step = 'AWAITING_PAYMENT';
@@ -1571,8 +1571,22 @@ export class BotEngine {
    */
   private static async handleConfirmInChatPayment(session: UserSession): Promise<string> {
     const searchPhone = session.realPhone || session.phone;
-    const orderNumber = session.pendingOrder?.orderNumber;
-    const txRef = session.pendingOrder?.txRef;
+    let orderNumber = session.pendingOrder?.orderNumber;
+    let txRef = session.pendingOrder?.txRef;
+
+    // Fallback: if the bot server restarted and lost in-memory pendingOrder, look up the active order from the Central Server
+    if (!orderNumber) {
+      try {
+        const activeRes = await CentralApiClient.getActiveOrder(searchPhone, {
+          altPhone: session.phone !== searchPhone ? session.phone : undefined,
+        });
+        const activeOrder = activeRes?.data;
+        if (activeOrder?.order_number) {
+          orderNumber = activeOrder.order_number;
+          txRef = activeOrder.alatpay_tx_ref || activeOrder.tx_ref;
+        }
+      } catch {}
+    }
 
     if (!orderNumber) {
       return this.handleTrackOrder(session);
@@ -1636,6 +1650,30 @@ export class BotEngine {
   }): Promise<boolean> {
     const session = sessionManager.findSessionByPhone(details.phone) || sessionManager.getSession(details.phone);
 
+    if (session.pendingOrder) {
+      session.lastActiveOrder = {
+        ...session.pendingOrder,
+        orderNumber: details.orderNumber || session.pendingOrder.orderNumber,
+        deliveryPin: details.deliveryPin || session.pendingOrder.deliveryPin,
+        restaurantName: details.restaurantName || session.pendingOrder.restaurantName,
+        totalNgn: details.totalNgn || session.pendingOrder.totalNgn,
+        status: 'paid',
+      };
+    } else {
+      session.lastActiveOrder = {
+        orderNumber: details.orderNumber,
+        restaurantName: details.restaurantName,
+        totalNgn: details.totalNgn,
+        deliveryPin: details.deliveryPin,
+        items: [],
+        hostel: session.hostel || 'Hostel Block C',
+        room: session.room || 'Room 214',
+        packagingCount: 1,
+        createdAt: Date.now(),
+        status: 'paid',
+      };
+    }
+
     session.cart = [];
     session.pendingOrder = undefined;
     session.step = 'MAIN_MENU';
@@ -1664,7 +1702,11 @@ export class BotEngine {
   private static async handleQuickPinLookup(session: UserSession): Promise<string> {
     try {
       const searchPhone = session.realPhone || session.phone;
-      const res = await CentralApiClient.getActiveOrder(searchPhone);
+      const orderHint = session.pendingOrder?.orderNumber || session.lastActiveOrder?.orderNumber;
+      const res = await CentralApiClient.getActiveOrder(searchPhone, {
+        altPhone: session.phone !== searchPhone ? session.phone : undefined,
+        orderNumber: orderHint,
+      });
       const order = res.data;
 
       if (order && order.delivery_pin) {
@@ -1691,6 +1733,14 @@ export class BotEngine {
         return 'PIN locked';
       }
 
+      if (session.lastActiveOrder?.deliveryPin) {
+        await ChannelService.sendMessage(
+          session,
+          `*Delivery PIN:* *${session.lastActiveOrder.deliveryPin}*\n\nProvide this 4-digit PIN to your rider when receiving order #${session.lastActiveOrder.orderNumber}.`
+        );
+        return 'PIN retrieved';
+      }
+
       await ChannelService.sendMessage(
         session,
         `No active orders found. Your 4-digit Delivery PIN appears automatically when you place an order.`
@@ -1712,8 +1762,25 @@ export class BotEngine {
   private static async handleTrackOrder(session: UserSession): Promise<string> {
     try {
       const searchPhone = session.realPhone || session.phone;
-      const res = await CentralApiClient.getActiveOrder(searchPhone);
-      const order = res.data;
+      const orderHint = session.pendingOrder?.orderNumber || session.lastActiveOrder?.orderNumber;
+      const res = await CentralApiClient.getActiveOrder(searchPhone, {
+        altPhone: session.phone !== searchPhone ? session.phone : undefined,
+        orderNumber: orderHint,
+      });
+      let order = res.data;
+
+      if (!order && session.lastActiveOrder && !session.pendingOrder) {
+        const lo = session.lastActiveOrder;
+        order = {
+          order_number: lo.orderNumber,
+          status: lo.status || 'paid',
+          restaurant_name: lo.restaurantName,
+          hostel: lo.hostel,
+          room: lo.room,
+          total_amount_ngn: lo.totalNgn,
+          delivery_pin: lo.deliveryPin,
+        };
+      }
 
       if (!order) {
         if (session.pendingOrder) {

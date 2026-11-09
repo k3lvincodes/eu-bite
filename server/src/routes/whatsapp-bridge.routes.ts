@@ -11,6 +11,24 @@ const router = Router();
 
 router.use(verifyBotAuth);
 
+// Helper to normalize Nigerian phone numbers so +23480..., 23480..., and 080... match seamlessly
+function normalizePhoneDigits(p?: string): string {
+  if (!p) return '';
+  const digits = p.replace(/[^0-9]/g, '');
+  if (digits.startsWith('234') && digits.length === 13) {
+    return `0${digits.slice(3)}`;
+  }
+  return digits;
+}
+
+function phonesMatch(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const normA = normalizePhoneDigits(a);
+  const normB = normalizePhoneDigits(b);
+  return normA.length >= 7 && normA === normB;
+}
+
 // 1. Identify or Auto-register student via WhatsApp phone
 router.post('/student-lookup', async (req: any, res: any): Promise<void> => {
   const { phone, fullName, studentId, department, level, hostel, room } = req.body;
@@ -22,7 +40,7 @@ router.post('/student-lookup', async (req: any, res: any): Promise<void> => {
 
   let user: User | undefined;
   for (const u of db.users.values()) {
-    if (u.phone === phone) {
+    if (phonesMatch(u.phone, phone)) {
       user = u;
       break;
     }
@@ -142,7 +160,7 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
     let student: Student | undefined;
     let user: User | undefined;
     for (const u of db.users.values()) {
-      if (u.phone === phone) {
+      if (phonesMatch(u.phone, phone)) {
         user = u;
         for (const s of db.students.values()) {
           if (s.user_id === u.id) {
@@ -404,55 +422,55 @@ router.post('/verify-payment', async (req: any, res: any): Promise<void> => {
 // 4. Track student active order by phone number
 router.get('/orders/active/:phoneNumber', (req: any, res: any): void => {
   const { phoneNumber } = req.params;
+  const altPhone = typeof req.query?.altPhone === 'string' ? req.query.altPhone : undefined;
+  const orderNumHint = typeof req.query?.orderNumber === 'string' ? req.query.orderNumber : undefined;
 
-  let student: Student | undefined;
+  const matchedStudentIds = new Set<string>();
   for (const s of db.students.values()) {
-    if (s.phone_number === phoneNumber) {
-      student = s;
-      break;
+    if (phonesMatch(s.phone_number, phoneNumber) || (altPhone && phonesMatch(s.phone_number, altPhone))) {
+      matchedStudentIds.add(s.id);
     }
   }
 
-  if (!student) {
-    for (const u of db.users.values()) {
-      if (u.phone === phoneNumber) {
-        for (const s of db.students.values()) {
-          if (s.user_id === u.id) {
-            student = s;
-            break;
-          }
+  for (const u of db.users.values()) {
+    if (phonesMatch(u.phone, phoneNumber) || (altPhone && phonesMatch(u.phone, altPhone))) {
+      for (const s of db.students.values()) {
+        if (s.user_id === u.id) {
+          matchedStudentIds.add(s.id);
         }
-        break;
       }
     }
   }
 
-  if (!student) {
-    res.status(404).json({ success: false, error: 'No student found for this phone number' });
-    return;
-  }
+  const activeOrders: Order[] = [];
+  const recentDeliveredOrders: Order[] = [];
 
-  const candidateOrders: Order[] = [];
   for (const o of db.orders.values()) {
-    if (
-      o.student_id === student.id &&
-      o.status !== 'delivered' &&
-      o.status !== 'cancelled' &&
-      o.status !== 'rejected'
-    ) {
-      candidateOrders.push(o);
+    const isMatchedStudent = matchedStudentIds.has(o.student_id);
+    const isMatchedOrderHint = Boolean(orderNumHint && o.order_number === orderNumHint);
+
+    if (!isMatchedStudent && !isMatchedOrderHint) continue;
+
+    if (o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'rejected') {
+      activeOrders.push(o);
+    } else if (o.status === 'delivered') {
+      recentDeliveredOrders.push(o);
     }
   }
 
   // Prioritize paid/in-progress orders over pending_payment, and newest over oldest
-  candidateOrders.sort((a, b) => {
-    const aPaid = a.payment_status === 'successful' ? 1 : 0;
-    const bPaid = b.payment_status === 'successful' ? 1 : 0;
-    if (aPaid !== bPaid) return bPaid - aPaid;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+  const sortOrders = (list: Order[]) =>
+    list.sort((a, b) => {
+      const aPaid = a.payment_status === 'successful' ? 1 : 0;
+      const bPaid = b.payment_status === 'successful' ? 1 : 0;
+      if (aPaid !== bPaid) return bPaid - aPaid;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
-  const latestOrder = candidateOrders[0];
+  sortOrders(activeOrders);
+  sortOrders(recentDeliveredOrders);
+
+  const latestOrder = activeOrders[0] || recentDeliveredOrders[0];
   let activeOrder: any = null;
   if (latestOrder) {
     const rest = db.restaurants.get(latestOrder.restaurant_id);

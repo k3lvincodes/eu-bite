@@ -203,14 +203,48 @@ export class CentralApiClient {
     }
   }
 
-  static async getActiveOrder(phoneNumber: string): Promise<any> {
+  static async getActiveOrder(
+    phoneNumber: string,
+    options?: { altPhone?: string; orderNumber?: string }
+  ): Promise<any> {
     try {
-      return await this.request(`/api/bot-bridge/orders/active/${encodeURIComponent(phoneNumber)}`);
+      const params = new URLSearchParams();
+      if (options?.altPhone) params.set('altPhone', options.altPhone);
+      if (options?.orderNumber) params.set('orderNumber', options.orderNumber);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return await this.request(`/api/bot-bridge/orders/active/${encodeURIComponent(phoneNumber)}${query}`);
     } catch {
-      const order = fallbackOrders.get(phoneNumber);
+      const order =
+        fallbackOrders.get(phoneNumber) ||
+        (options?.altPhone ? fallbackOrders.get(options.altPhone) : undefined);
+      if (order) {
+        return {
+          success: true,
+          data: order,
+        };
+      }
+      // Also check normalized phone format (+234 vs 0) or orderNumber in fallbackOrders
+      const digits = phoneNumber.replace(/[^0-9]/g, '');
+      const localDigits = digits.startsWith('234') && digits.length === 13 ? `0${digits.slice(3)}` : digits;
+      for (const [k, v] of fallbackOrders.entries()) {
+        const kDigits = k.replace(/[^0-9]/g, '');
+        const kLocal = kDigits.startsWith('234') && kDigits.length === 13 ? `0${kDigits.slice(3)}` : kDigits;
+        if (
+          k === phoneNumber ||
+          (options?.altPhone && k === options.altPhone) ||
+          (localDigits.length >= 10 && kLocal === localDigits) ||
+          v?.order_number === phoneNumber ||
+          (options?.orderNumber && v?.order_number === options.orderNumber)
+        ) {
+          return {
+            success: true,
+            data: v,
+          };
+        }
+      }
       return {
         success: true,
-        data: order || null,
+        data: null,
       };
     }
   }

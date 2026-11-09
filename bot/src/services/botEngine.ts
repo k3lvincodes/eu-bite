@@ -80,6 +80,10 @@ export class BotEngine {
       return this.handleSupport(session);
     }
 
+    if (lower === 'reorder' || lower === 'reorder meal') {
+      return this.displayRestaurantList(session);
+    }
+
     if (
       lower === 'confirm_payment' ||
       lower === 'paid' ||
@@ -161,6 +165,12 @@ export class BotEngine {
       case 'PROFILE_EDIT_NAME':
         session.studentName = cleanText;
         sessionManager.saveSession(session);
+        CentralApiClient.lookupOrRegisterStudent({
+          phone: session.realPhone || session.phone,
+          fullName: session.studentName,
+          hostel: session.hostel,
+          room: session.room,
+        }).catch(() => {});
         await ChannelService.sendMessage(session, `Name updated to *${session.studentName}*.`);
         return this.displayProfile(session);
 
@@ -173,6 +183,12 @@ export class BotEngine {
       case 'PROFILE_EDIT_ROOM':
         session.room = cleanText.startsWith('Room') ? cleanText : `Room ${cleanText.replace(/room/i, '').trim()}`;
         sessionManager.saveSession(session);
+        CentralApiClient.lookupOrRegisterStudent({
+          phone: session.realPhone || session.phone,
+          fullName: session.studentName,
+          hostel: session.hostel,
+          room: session.room,
+        }).catch(() => {});
         await ChannelService.sendMessage(session, `Room updated to *${session.room}*.`);
         return this.displayProfile(session);
 
@@ -313,8 +329,11 @@ export class BotEngine {
     return this.promptHostelSelection(session);
   }
 
-  private static async promptHostelSelection(session: UserSession): Promise<string> {
-    session.step = 'ONBOARDING_HOSTEL';
+  private static async promptHostelSelection(
+    session: UserSession,
+    targetStep: 'ONBOARDING_HOSTEL' | 'PROFILE_EDIT_HOSTEL' = 'ONBOARDING_HOSTEL'
+  ): Promise<string> {
+    session.step = targetStep;
     sessionManager.saveSession(session);
 
     let msg = `*Select Your Campus Hostel:*\n\n`;
@@ -413,9 +432,7 @@ export class BotEngine {
   private static async handleProfileOption(session: UserSession, text: string): Promise<string> {
     const lower = text.toLowerCase();
     if (lower === 'edit_room' || lower.includes('room') || lower.includes('hostel')) {
-      session.step = 'PROFILE_EDIT_HOSTEL';
-      sessionManager.saveSession(session);
-      return this.promptHostelSelection(session);
+      return this.promptHostelSelection(session, 'PROFILE_EDIT_HOSTEL');
     }
     if (lower === 'edit_phone' || lower.includes('phone')) {
       session.step = 'PROFILE_EDIT_PHONE';
@@ -440,6 +457,12 @@ export class BotEngine {
     }
     session.realPhone = cleaned.startsWith('0') ? `+234${cleaned.slice(1)}` : cleaned;
     sessionManager.saveSession(session);
+    CentralApiClient.lookupOrRegisterStudent({
+      phone: session.realPhone,
+      fullName: session.studentName,
+      hostel: session.hostel,
+      room: session.room,
+    }).catch(() => {});
     await ChannelService.sendMessage(session, `Phone updated to *${session.realPhone}*.`);
     return this.displayProfile(session);
   }
@@ -1028,7 +1051,7 @@ export class BotEngine {
       return this.promptItemNoteSelection(session, lower);
     }
 
-    // Handle button clicks like plus_1, minus_1
+    // Handle button clicks like plus_1, minus_1, rm_1
     if (lower.startsWith('plus_')) {
       const idx = parseInt(lower.replace('plus_', ''), 10) - 1;
       if (idx >= 0 && idx < session.cart.length) {
@@ -1049,8 +1072,48 @@ export class BotEngine {
         return this.displayCart(session);
       }
     }
+    if (lower.startsWith('rm_')) {
+      const idx = parseInt(lower.replace('rm_', ''), 10) - 1;
+      if (idx >= 0 && idx < session.cart.length) {
+        const [removed] = session.cart.splice(idx, 1);
+        sessionManager.saveSession(session);
+        await ChannelService.sendMessage(session, `Removed *${removed.name}* from your tray.`);
+        return this.displayCart(session);
+      }
+    }
 
-    // Handle text removal
+    // Handle bare +, -, or delete when editing the active/last cart item
+    if (lower === '+' || lower === '+1') {
+      const target = session.cart.find((c) => c.itemId === session.lastAddedItemId) || session.cart[0];
+      if (target) {
+        target.quantity += 1;
+        sessionManager.saveSession(session);
+        return this.displayCart(session);
+      }
+    }
+    if (lower === '-' || lower === '-1') {
+      const targetIdx = Math.max(0, session.cart.findIndex((c) => c.itemId === session.lastAddedItemId));
+      if (session.cart[targetIdx]) {
+        if (session.cart[targetIdx].quantity > 1) {
+          session.cart[targetIdx].quantity -= 1;
+        } else {
+          session.cart.splice(targetIdx, 1);
+        }
+        sessionManager.saveSession(session);
+        return this.displayCart(session);
+      }
+    }
+    if (lower === 'delete' || lower === 'remove') {
+      const targetIdx = Math.max(0, session.cart.findIndex((c) => c.itemId === session.lastAddedItemId));
+      if (session.cart[targetIdx]) {
+        const [removed] = session.cart.splice(targetIdx, 1);
+        sessionManager.saveSession(session);
+        await ChannelService.sendMessage(session, `Removed *${removed.name}* from your tray.`);
+        return this.displayCart(session);
+      }
+    }
+
+    // Handle text removal with index (e.g. "remove 1", "-1")
     if (lower.startsWith('remove') || lower.startsWith('delete') || lower.startsWith('rm') || lower.startsWith('-')) {
       return this.handleRemoveItem(session, lower);
     }
@@ -1059,6 +1122,8 @@ export class BotEngine {
     const num = parseInt(lower, 10);
     if (!isNaN(num) && num >= 1 && num <= session.cart.length) {
       const item = session.cart[num - 1];
+      session.lastAddedItemId = item.itemId;
+      sessionManager.saveSession(session);
       const prompt =
         `Editing *${item.name}* (currently x${item.quantity}):\n` +
         `• Reply *+* to add 1\n` +

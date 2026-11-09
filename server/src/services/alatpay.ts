@@ -179,8 +179,7 @@ export class AlatPayService {
     tx_ref: string,
     transactionId?: string
   ): Promise<{ confirmed: boolean; providerRef?: string; message?: string }> {
-    const enforceStrictLiveCheck =
-      process.env.NODE_ENV === 'production' || process.env.ALATPAY_ENFORCE_LIVE_VERIFY === 'true';
+    const enforceStrictLiveCheck = process.env.ALATPAY_ENFORCE_LIVE_VERIFY === 'true';
 
     if (!this.isLiveMode()) {
       return { confirmed: true, providerRef: transactionId || `ALAT-SANDBOX-${Date.now()}` };

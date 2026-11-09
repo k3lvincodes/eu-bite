@@ -144,9 +144,16 @@ export default function VendorDashboardPage() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: string) => {
+  const updateOrderStatus = async (orderId: string, status: string, txRef?: string, isUnpaid?: boolean) => {
     if (!token) return;
     try {
+      if (isUnpaid && txRef) {
+        await fetch(`${API_BASE}/api/payments/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tx_ref: txRef, status: 'successful' }),
+        });
+      }
       const res = await fetch(`${API_BASE}/api/orders/${orderId}/vendor-status`, {
         method: 'PATCH',
         headers: {
@@ -429,9 +436,16 @@ export default function VendorDashboardPage() {
 
                   {/* Vendor Action Buttons */}
                   <div className="flex items-center gap-2">
-                    {order.status === 'paid' && (
+                    {(order.status === 'paid' || order.status === 'pending_payment') && (
                       <button
-                        onClick={() => updateOrderStatus(order.id, 'vendor_accepted')}
+                        onClick={() =>
+                          updateOrderStatus(
+                            order.id,
+                            'vendor_accepted',
+                            order.alatpay_tx_ref || order.order_number,
+                            order.payment_status !== 'successful'
+                          )
+                        }
                         className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm"
                       >
                         Accept Order

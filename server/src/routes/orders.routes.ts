@@ -5,6 +5,7 @@ import { db } from '../db/index.ts';
 import { authenticate } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { logAudit } from '../utils/logger.ts';
+import { syncOrdersFromRemote, pushOrderStatusToRemote } from '../utils/remoteSync.ts';
 import type { Order, OrderItem, OrderStatus } from '../types/index.ts';
 
 const router = Router();
@@ -213,12 +214,14 @@ router.post('/', authenticate, async (req: any, res: any): Promise<void> => {
 });
 
 // GET /api/orders
-router.get('/', authenticate, (req: any, res: any): void => {
+router.get('/', authenticate, async (req: any, res: any): Promise<void> => {
+  await syncOrdersFromRemote();
   const { role, userId } = req.user!;
   const ordersList: any[] = [];
 
   for (const order of db.orders.values()) {
     let include = false;
+    const items = Array.from(db.orderItems.values()).filter((i) => i.order_id === order.id);
 
     if (role === 'admin') {
       include = true;
@@ -230,10 +233,18 @@ router.get('/', authenticate, (req: any, res: any): void => {
         }
       }
     } else if (role === 'vendor') {
-      for (const rest of db.restaurants.values()) {
-        if (rest.vendor_user_id === userId && rest.id === order.restaurant_id) {
-          include = true;
-          break;
+      if (order.status !== 'cancelled') {
+        for (const rest of db.restaurants.values()) {
+          if (rest.vendor_user_id === userId) {
+            const hasVendorItem = items.some((oi) => {
+              const mi = db.menuItems.get(oi.menu_item_id);
+              return mi && mi.restaurant_id === rest.id;
+            });
+            if (rest.id === order.restaurant_id || hasVendorItem) {
+              include = true;
+              break;
+            }
+          }
         }
       }
     } else if (role === 'rider') {
@@ -247,7 +258,6 @@ router.get('/', authenticate, (req: any, res: any): void => {
 
     if (include) {
       const rest = db.restaurants.get(order.restaurant_id);
-      const items = Array.from(db.orderItems.values()).filter((i) => i.order_id === order.id);
       const pack = order.packaging_type_id ? db.packagingTypes.get(order.packaging_type_id) : undefined;
       const rider = order.rider_id ? db.riders.get(order.rider_id) : undefined;
 
@@ -269,7 +279,8 @@ router.get('/', authenticate, (req: any, res: any): void => {
 });
 
 // GET /api/orders/track/:query (Public single-order lookup by order_number, id, or delivery_pin)
-router.get('/track/:query', (req: any, res: any): void => {
+router.get('/track/:query', async (req: any, res: any): Promise<void> => {
+  await syncOrdersFromRemote();
   const rawQuery = (req.params.query || '').trim().toLowerCase();
   if (!rawQuery) {
     res.status(400).json({ success: false, error: 'Order number or tracking reference is required.' });
@@ -338,7 +349,7 @@ router.get('/:id', authenticate, (req: any, res: any): void => {
 });
 
 // PATCH /api/orders/:id/vendor-status
-router.patch('/:id/vendor-status', authenticate, (req: any, res: any): void => {
+router.patch('/:id/vendor-status', authenticate, async (req: any, res: any): Promise<void> => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -349,7 +360,20 @@ router.patch('/:id/vendor-status', authenticate, (req: any, res: any): void => {
   }
 
   const restaurant = db.restaurants.get(order.restaurant_id);
-  if (!restaurant || (req.user!.role !== 'admin' && restaurant.vendor_user_id !== req.user!.userId)) {
+  const items = Array.from(db.orderItems.values()).filter((i) => i.order_id === order.id);
+  let ownsOrderRestaurant = restaurant && restaurant.vendor_user_id === req.user!.userId;
+  if (!ownsOrderRestaurant) {
+    for (const rest of db.restaurants.values()) {
+      if (rest.vendor_user_id === req.user!.userId) {
+        if (items.some((oi) => db.menuItems.get(oi.menu_item_id)?.restaurant_id === rest.id)) {
+          ownsOrderRestaurant = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (req.user!.role !== 'admin' && !ownsOrderRestaurant) {
     res.status(403).json({ success: false, error: 'Forbidden: You do not manage this restaurant.' });
     return;
   }
@@ -371,6 +395,8 @@ router.patch('/:id/vendor-status', authenticate, (req: any, res: any): void => {
   }
   order.updated_at = new Date().toISOString();
   db.orders.set(order.id, order);
+
+  pushOrderStatusToRemote(order.id, order.alatpay_tx_ref, status).catch(() => {});
 
   logAudit('ORDER_VENDOR_STATUS_UPDATED', 'orders', order.id, req.user!.userId, req.user!.role, { new_status: status });
 

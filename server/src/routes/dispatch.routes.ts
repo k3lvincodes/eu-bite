@@ -3,6 +3,7 @@ import { db } from '../db/index.ts';
 import { authenticate, requireRole } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { logAudit } from '../utils/logger.ts';
+import { syncOrdersFromRemote } from '../utils/remoteSync.ts';
 import type { Rider } from '../types/index.ts';
 
 const router = Router();
@@ -15,7 +16,8 @@ function getRiderProfile(userId: string): Rider | undefined {
 }
 
 // GET /api/dispatch/rider-stats
-router.get('/rider-stats', authenticate, requireRole('rider'), (req: any, res: any): void => {
+router.get('/rider-stats', authenticate, requireRole('rider'), async (req: any, res: any): Promise<void> => {
+  await syncOrdersFromRemote();
   const rider = getRiderProfile(req.user!.userId);
   if (!rider) {
     res.status(404).json({ success: false, error: 'Rider profile not found' });
@@ -78,7 +80,8 @@ router.patch('/toggle-online', authenticate, requireRole('rider'), (req: any, re
 });
 
 // GET /api/dispatch/available
-router.get('/available', authenticate, requireRole('rider'), (req: any, res: any): void => {
+router.get('/available', authenticate, requireRole('rider'), async (req: any, res: any): Promise<void> => {
+  await syncOrdersFromRemote();
   const rider = getRiderProfile(req.user!.userId);
   if (!rider) {
     res.status(404).json({ success: false, error: 'Rider profile not found' });

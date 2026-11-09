@@ -3,12 +3,14 @@ import { db } from '../db/index.ts';
 import { authenticate, requireRole } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { logAudit } from '../utils/logger.ts';
+import { syncOrdersFromRemote } from '../utils/remoteSync.ts';
 import type { RiderApprovalStatus } from '../types/index.ts';
 
 const router = Router();
 
 // GET /api/admin/metrics
-router.get('/metrics', authenticate, requireRole('admin'), (req: any, res: any): void => {
+router.get('/metrics', authenticate, requireRole('admin'), async (req: any, res: any): Promise<void> => {
+  await syncOrdersFromRemote();
   let totalGmvKobo = 0;
   let paidOrdersCount = 0;
   let deliveredOrdersCount = 0;
@@ -138,6 +140,19 @@ router.patch('/settings/:key', authenticate, requireRole('admin'), (req: any, re
   }
 
   db.platformSettings.set(key, setting);
+
+  // Sync packaging fee settings to db.packagingTypes so checkout reflects updated fee immediately
+  if (key === 'reusable_pack_fee_kobo' || key === 'school_pack_fee_kobo') {
+    const targetCode = key === 'reusable_pack_fee_kobo' ? 'reusable' : 'school';
+    for (const p of db.packagingTypes.values()) {
+      if (p.code === targetCode) {
+        p.fee_kobo = Number(value) || p.fee_kobo;
+        p.updated_at = now;
+        db.packagingTypes.set(p.id, p);
+      }
+    }
+  }
+
   logAudit('PLATFORM_SETTING_UPDATED', 'platform_settings', key, req.user!.userId, 'admin', { value });
 
   res.json({ success: true, message: `Setting '${key}' updated.`, data: setting });

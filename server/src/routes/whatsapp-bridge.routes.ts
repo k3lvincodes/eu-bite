@@ -31,8 +31,20 @@ router.post('/student-lookup', async (req: any, res: any): Promise<void> => {
   let student: Student | undefined;
 
   if (user) {
+    const now = new Date().toISOString();
+    if (fullName) {
+      user.full_name = fullName;
+      user.updated_at = now;
+      db.users.set(user.id, user);
+    }
     for (const s of db.students.values()) {
       if (s.user_id === user.id) {
+        if (hostel) s.default_hostel = hostel;
+        if (room) s.default_room = room;
+        if (department) s.department = department;
+        if (level) s.academic_level = level;
+        s.updated_at = now;
+        db.students.set(s.id, s);
         student = s;
         break;
       }

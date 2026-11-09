@@ -262,12 +262,14 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
     }
 
     const packagingQty = Math.max(1, Number(req.body.packaging_count) || totalItemContainers || 1);
+    const targetPackCode = packaging_type === 'school' ? 'school' : 'reusable';
+    const packFeeSettingKey = targetPackCode === 'school' ? 'school_pack_fee_kobo' : 'reusable_pack_fee_kobo';
     let packTypeId: string | undefined;
-    let unitPackFeeKobo = 25000;
+    let unitPackFeeKobo = Number(db.platformSettings.get(packFeeSettingKey)?.value_json) || 25000;
     for (const p of db.packagingTypes.values()) {
-      if (p.code === (packaging_type === 'school' ? 'school' : 'reusable')) {
+      if (p.code === targetPackCode) {
         packTypeId = p.id;
-        unitPackFeeKobo = p.fee_kobo;
+        unitPackFeeKobo = Number(db.platformSettings.get(packFeeSettingKey)?.value_json) || p.fee_kobo;
         break;
       }
     }

@@ -8,7 +8,21 @@ const isTestEnv =
   process.argv.some((a) => a.includes('.test.'));
 
 let cachedRemoteAdminToken: string | null = null;
+let cachedRemoteRiderToken: string | null = null;
 let lastSyncTimestamp = 0;
+
+const STATUS_RANK: Record<string, number> = {
+  pending_payment: 0,
+  paid: 1,
+  vendor_accepted: 2,
+  preparing: 3,
+  ready_for_pickup: 4,
+  rider_assigned: 5,
+  in_transit: 6,
+  delivered: 7,
+  rejected: 8,
+  cancelled: 9,
+};
 
 async function getRemoteAdminToken(): Promise<string | null> {
   if (cachedRemoteAdminToken) return cachedRemoteAdminToken;
@@ -23,6 +37,24 @@ async function getRemoteAdminToken(): Promise<string | null> {
     if (data?.success && data?.token) {
       cachedRemoteAdminToken = data.token;
       return cachedRemoteAdminToken;
+    }
+  } catch {}
+  return null;
+}
+
+async function getRemoteRiderToken(): Promise<string | null> {
+  if (cachedRemoteRiderToken) return cachedRemoteRiderToken;
+  try {
+    const res = await fetch(`${REMOTE_API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'rider.musa@eubite.com', password: 'Password123!' }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as any;
+    if (data?.success && data?.token) {
+      cachedRemoteRiderToken = data.token;
+      return cachedRemoteRiderToken;
     }
   } catch {}
   return null;
@@ -62,11 +94,11 @@ export async function syncOrdersFromRemote(force = false): Promise<void> {
     for (const ro of remoteOrders) {
       const existing = db.orders.get(ro.id);
 
-      // Orders created on Render before the ALATPay sandbox fix where user already tapped "I Have Paid"
+      // Orders created via the bot on Render where the user confirmed payment in-chat
       const shouldPromotePaid =
         ro.payment_status === 'successful' ||
         ro.status !== 'pending_payment' ||
-        ro.order_number === 'EUB-202611-5428';
+        Boolean(ro.alatpay_tx_ref && (ro.alatpay_tx_ref.startsWith('EUB-WA-') || ro.alatpay_tx_ref.startsWith('EUB-TG-')));
 
       if (!existing) {
         const orderRecord: Order = {
@@ -117,12 +149,19 @@ export async function syncOrdersFromRemote(force = false): Promise<void> {
           }
         }
       } else {
-        // Merge remote payment confirmation if remote transitioned to paid
+        // Merge remote payment confirmation or status advancement if remote progressed further
+        let changed = false;
         if (ro.payment_status === 'successful' && existing.payment_status !== 'successful') {
           existing.payment_status = 'successful';
-          if (existing.status === 'pending_payment') {
-            existing.status = ro.status === 'pending_payment' ? 'paid' : ro.status;
-          }
+          changed = true;
+        }
+        const remoteRank = STATUS_RANK[ro.status] ?? 0;
+        const localRank = STATUS_RANK[existing.status] ?? 0;
+        if (remoteRank > localRank) {
+          existing.status = ro.status;
+          changed = true;
+        }
+        if (changed) {
           existing.updated_at = new Date().toISOString();
           db.orders.set(existing.id, existing);
         }
@@ -132,7 +171,7 @@ export async function syncOrdersFromRemote(force = false): Promise<void> {
 }
 
 /**
- * Pushes vendor/rider order status updates from local dev back to Render so @eubite_bot /track stays in sync.
+ * Pushes vendor order status updates from local dev back to Render so @eubite_bot /track stays in sync.
  */
 export async function pushOrderStatusToRemote(orderId: string, txRef?: string, status?: string): Promise<void> {
   if (isTestEnv || process.env.NODE_ENV === 'production') return;
@@ -160,3 +199,39 @@ export async function pushOrderStatusToRemote(orderId: string, txRef?: string, s
     }
   } catch {}
 }
+
+/**
+ * Pushes rider dispatch actions (claim, pickup, deliver) from local dev back to Render so @eubite_bot /track stays in sync.
+ */
+export async function pushRiderActionToRemote(
+  orderId: string,
+  action: 'claim' | 'pickup' | 'deliver',
+  pin?: string
+): Promise<void> {
+  if (isTestEnv || process.env.NODE_ENV === 'production') return;
+  try {
+    const riderToken = await getRemoteRiderToken();
+    if (!riderToken) return;
+
+    if (action === 'claim') {
+      await fetch(`${REMOTE_API_URL}/api/dispatch/toggle-online`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${riderToken}`,
+        },
+        body: JSON.stringify({ is_online: true }),
+      }).catch(() => {});
+    }
+
+    await fetch(`${REMOTE_API_URL}/api/dispatch/${orderId}/${action}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${riderToken}`,
+      },
+      body: pin ? JSON.stringify({ pin }) : JSON.stringify({}),
+    }).catch(() => {});
+  } catch {}
+}
+

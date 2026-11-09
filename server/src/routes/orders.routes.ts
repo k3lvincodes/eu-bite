@@ -125,13 +125,16 @@ router.post('/', authenticate, async (req: any, res: any): Promise<void> => {
     if (packagingTypeId) {
       const pack = db.packagingTypes.get(packagingTypeId);
       if (pack && pack.is_active) {
-        packaging_fee_kobo = pack.fee_kobo * packaging_qty;
+        const settingKey = pack.code === 'school' ? 'school_pack_fee_kobo' : 'reusable_pack_fee_kobo';
+        const configuredFee = db.platformSettings.get(settingKey)?.value_json ?? pack.fee_kobo;
+        packaging_fee_kobo = Number(configuredFee) * packaging_qty;
       }
     } else {
       for (const p of db.packagingTypes.values()) {
         if (p.code === 'reusable' && p.is_active) {
           packagingTypeId = p.id;
-          packaging_fee_kobo = p.fee_kobo * packaging_qty;
+          const configuredFee = db.platformSettings.get('reusable_pack_fee_kobo')?.value_json ?? p.fee_kobo;
+          packaging_fee_kobo = Number(configuredFee) * packaging_qty;
           break;
         }
       }
@@ -233,7 +236,7 @@ router.get('/', authenticate, async (req: any, res: any): Promise<void> => {
         }
       }
     } else if (role === 'vendor') {
-      if (order.status !== 'cancelled') {
+      if (order.payment_status === 'successful' && order.status !== 'pending_payment' && order.status !== 'cancelled') {
         for (const rest of db.restaurants.values()) {
           if (rest.vendor_user_id === userId) {
             const hasVendorItem = items.some((oi) => {

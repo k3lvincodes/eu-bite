@@ -102,7 +102,16 @@ router.patch('/types/:id', authenticate, requireRole('admin'), (req: any, res: a
   }
 
   const { fee_kobo, name, description, is_active } = req.body;
-  if (fee_kobo !== undefined) packType.fee_kobo = fee_kobo;
+  if (fee_kobo !== undefined) {
+    packType.fee_kobo = fee_kobo;
+    const settingKey = packType.code === 'school' ? 'school_pack_fee_kobo' : 'reusable_pack_fee_kobo';
+    const existingSetting = db.platformSettings.get(settingKey);
+    if (existingSetting) {
+      existingSetting.value_json = Number(fee_kobo);
+      existingSetting.updated_at = new Date().toISOString();
+      db.platformSettings.set(settingKey, existingSetting);
+    }
+  }
   if (name !== undefined) packType.name = name;
   if (description !== undefined) packType.description = description;
   if (is_active !== undefined) packType.is_active = is_active;

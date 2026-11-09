@@ -3,7 +3,7 @@ import { db } from '../db/index.ts';
 import { authenticate, requireRole } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { logAudit } from '../utils/logger.ts';
-import { syncOrdersFromRemote } from '../utils/remoteSync.ts';
+import { syncOrdersFromRemote, pushRiderActionToRemote } from '../utils/remoteSync.ts';
 import type { Rider } from '../types/index.ts';
 
 const router = Router();
@@ -163,6 +163,7 @@ router.post('/:id/claim', authenticate, requireRole('rider'), async (req: any, r
   }
 
   logAudit('ORDER_CLAIMED_BY_RIDER', 'orders', id, req.user!.userId, 'rider', { rider_id: rider.id });
+  pushRiderActionToRemote(id, 'claim').catch(() => {});
 
   const claimedOrder = claimResult.order!;
   const rest = db.restaurants.get(claimedOrder.restaurant_id);
@@ -206,6 +207,7 @@ router.post('/:id/pickup', authenticate, requireRole('rider'), (req: any, res: a
   db.orders.set(order.id, order);
 
   logAudit('ORDER_PICKED_UP', 'orders', order.id, req.user!.userId, 'rider');
+  pushRiderActionToRemote(order.id, 'pickup').catch(() => {});
 
   res.json({
     success: true,
@@ -283,6 +285,7 @@ router.post('/:id/deliver', authenticate, requireRole('rider'), (req: any, res: 
     order_number: order.order_number,
     payout_kobo: riderPayoutKobo,
   });
+  pushRiderActionToRemote(order.id, 'deliver', pin.toString().trim()).catch(() => {});
 
   res.json({
     success: true,

@@ -1262,7 +1262,8 @@ export class BotEngine {
     }
 
     const removed = session.cart[idx];
-    if (removed.quantity > 1) {
+    const forceFullDelete = text.startsWith('delete') || text.startsWith('rm_') || text.startsWith('rm ');
+    if (!forceFullDelete && removed.quantity > 1) {
       removed.quantity -= 1;
       await ChannelService.sendMessage(session, `Reduced *${removed.name}* quantity to ${removed.quantity}.`);
     } else {

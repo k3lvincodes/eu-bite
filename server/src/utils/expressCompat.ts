@@ -58,6 +58,22 @@ export class MiniApp extends MiniRouter {
 
   listen(port: number | string, callback?: () => void) {
     const server = http.createServer(async (req: any, res: any) => {
+      // Universal CORS Headers & Preflight (OPTIONS) Support
+      const origin = req.headers.origin || '*';
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, x-bot-service-token, x-alatpay-signature, ocp-apim-subscription-key, verif-hash'
+      );
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+
       // Enhance res
       res.status = (statusCode: number) => {
         res.statusCode = statusCode;

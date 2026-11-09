@@ -43,6 +43,18 @@ export class MiniApp extends MiniRouter {
 
   listen(port: number | string, callback?: () => void) {
     const server = http.createServer(async (req: any, res: any) => {
+      const origin = req.headers.origin || '*';
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-bot-service-token');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+
       res.status = (statusCode: number) => {
         res.statusCode = statusCode;
         return res;

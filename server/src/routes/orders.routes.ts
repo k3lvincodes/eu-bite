@@ -268,6 +268,49 @@ router.get('/', authenticate, (req: any, res: any): void => {
   res.json({ success: true, count: ordersList.length, data: ordersList });
 });
 
+// GET /api/orders/track/:query (Public single-order lookup by order_number, id, or delivery_pin)
+router.get('/track/:query', (req: any, res: any): void => {
+  const rawQuery = (req.params.query || '').trim().toLowerCase();
+  if (!rawQuery) {
+    res.status(400).json({ success: false, error: 'Order number or tracking reference is required.' });
+    return;
+  }
+
+  let matchedOrder: Order | undefined;
+  for (const o of db.orders.values()) {
+    if (
+      o.order_number?.toLowerCase() === rawQuery ||
+      o.id?.toLowerCase() === rawQuery ||
+      (o.payment_status === 'successful' && o.delivery_pin === rawQuery)
+    ) {
+      matchedOrder = o;
+      break;
+    }
+  }
+
+  if (!matchedOrder) {
+    res.status(404).json({ success: false, error: `Order #${req.params.query} not found.` });
+    return;
+  }
+
+  const rest = db.restaurants.get(matchedOrder.restaurant_id);
+  const items = Array.from(db.orderItems.values()).filter((i) => i.order_id === matchedOrder!.id);
+  const pack = matchedOrder.packaging_type_id ? db.packagingTypes.get(matchedOrder.packaging_type_id) : undefined;
+  const rider = matchedOrder.rider_id ? db.riders.get(matchedOrder.rider_id) : undefined;
+
+  const safeOrder = {
+    ...matchedOrder,
+    restaurant_name: rest?.name || 'Campus Kitchen',
+    restaurant_phone: rest?.phone,
+    packaging_type_name: pack?.name,
+    rider_details: rider ? { id: rider.id, vehicle_type: rider.vehicle_type } : null,
+    items,
+    delivery_pin: matchedOrder.payment_status === 'successful' ? matchedOrder.delivery_pin : 'Locked (Awaiting Payment)',
+  };
+
+  res.json({ success: true, data: safeOrder });
+});
+
 // GET /api/orders/:id
 router.get('/:id', authenticate, (req: any, res: any): void => {
   const { id } = req.params;

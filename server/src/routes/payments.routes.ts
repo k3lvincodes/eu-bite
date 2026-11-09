@@ -94,8 +94,33 @@ router.post('/webhook', async (req: any, res: any): Promise<void> => {
   const result = await AlatPayService.processPaymentVerification(
     tx_ref,
     alatpay_ref,
-    status || 'successful'
+    status || 'successful',
+    false
   );
+
+  if (result.verified && result.orderId) {
+    const paidOrder = db.orders.get(result.orderId);
+    if (paidOrder) {
+      const rest = db.restaurants.get(paidOrder.restaurant_id);
+      const student = db.students.get(paidOrder.student_id);
+      const user = student ? db.users.get(student.user_id) : null;
+      const targetPhone = user?.phone || student?.phone_number;
+      if (targetPhone) {
+        const botBase = process.env.BOT_SERVICE_URL || 'http://localhost:4001';
+        fetch(`${botBase}/webhook/payment-notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderNumber: paidOrder.order_number,
+            phone: targetPhone,
+            deliveryPin: paidOrder.delivery_pin,
+            restaurantName: rest?.name || 'Campus Kitchen',
+            totalNgn: paidOrder.total_amount_kobo / 100,
+          }),
+        }).catch(() => {});
+      }
+    }
+  }
 
   res.status(200).json({ success: true, message: result.message });
 });
@@ -113,7 +138,8 @@ router.post('/verify', async (req: any, res: any): Promise<void> => {
   const result = await AlatPayService.processPaymentVerification(
     resolvedRef,
     alatpay_ref,
-    status === 'successful' || !status ? 'successful' : status
+    status === 'successful' || !status ? 'successful' : status,
+    true
   );
 
   if (!result.verified && result.status !== 'successful') {

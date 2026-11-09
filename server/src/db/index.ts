@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { hashPassword } from '../utils/hash.ts';
 import pg from 'pg';
 const { Pool } = pg;
@@ -37,26 +39,200 @@ if (connectionString && !connectionString.includes('your-supabase-project')) {
   }
 }
 
-// In-Memory Database Store (High-Fidelity for Local Dev & Testing)
+const isTestEnv =
+  process.env.NODE_ENV === 'test' ||
+  process.execArgv.some((a) => a.includes('test')) ||
+  process.argv.some((a) => a.includes('.test.'));
+
+const SNAPSHOT_FILE = path.resolve(process.cwd(), '.data', 'eubite-db-snapshot.json');
+
+class PersistentMap<K, V> extends Map<K, V> {
+  private onMutate?: () => void;
+
+  setOnMutate(fn: () => void) {
+    this.onMutate = fn;
+  }
+
+  override set(key: K, value: V): this {
+    super.set(key, value);
+    this.onMutate?.();
+    return this;
+  }
+
+  override delete(key: K): boolean {
+    const res = super.delete(key);
+    if (res) this.onMutate?.();
+    return res;
+  }
+
+  override clear(): void {
+    super.clear();
+    this.onMutate?.();
+  }
+}
+
+// Persistent Database Store (Disk + PostgreSQL Sync + High-Speed Memory Cache)
 class MemoryStore {
-  users: Map<string, User> = new Map();
-  students: Map<string, Student> = new Map();
-  restaurants: Map<string, Restaurant> = new Map();
-  menuItems: Map<string, MenuItem> = new Map();
-  packagingTypes: Map<string, PackagingType> = new Map();
-  packTransactions: Map<string, PackTransaction> = new Map();
-  riders: Map<string, Rider> = new Map();
-  orders: Map<string, Order> = new Map();
-  orderItems: Map<string, OrderItem> = new Map();
-  platformSettings: Map<string, PlatformSetting> = new Map();
-  supportTickets: Map<string, SupportTicket> = new Map();
-  auditLogs: Map<string, AuditLog> = new Map();
+  users: PersistentMap<string, User> = new PersistentMap();
+  students: PersistentMap<string, Student> = new PersistentMap();
+  restaurants: PersistentMap<string, Restaurant> = new PersistentMap();
+  menuItems: PersistentMap<string, MenuItem> = new PersistentMap();
+  packagingTypes: PersistentMap<string, PackagingType> = new PersistentMap();
+  packTransactions: PersistentMap<string, PackTransaction> = new PersistentMap();
+  riders: PersistentMap<string, Rider> = new PersistentMap();
+  orders: PersistentMap<string, Order> = new PersistentMap();
+  orderItems: PersistentMap<string, OrderItem> = new PersistentMap();
+  platformSettings: PersistentMap<string, PlatformSetting> = new PersistentMap();
+  supportTickets: PersistentMap<string, SupportTicket> = new PersistentMap();
+  auditLogs: PersistentMap<string, AuditLog> = new PersistentMap();
 
   // Atomic claim lock map
   private claimLocks: Set<string> = new Set();
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private isHydrating = false;
 
   constructor() {
     this.seed();
+    if (!isTestEnv) {
+      this.loadSnapshotFromDisk();
+      this.bindPersistenceHooks();
+      this.syncFromPostgres().catch(() => {});
+    }
+  }
+
+  private bindPersistenceHooks() {
+    const triggerSave = () => {
+      if (this.isHydrating || isTestEnv) return;
+      if (this.flushTimer) clearTimeout(this.flushTimer);
+      this.flushTimer = setTimeout(() => {
+        this.saveSnapshotToDisk();
+      }, 150);
+    };
+
+    const maps = [
+      this.users,
+      this.students,
+      this.restaurants,
+      this.menuItems,
+      this.packagingTypes,
+      this.packTransactions,
+      this.riders,
+      this.orders,
+      this.orderItems,
+      this.platformSettings,
+      this.supportTickets,
+      this.auditLogs,
+    ];
+    for (const m of maps) {
+      m.setOnMutate(triggerSave);
+    }
+  }
+
+  private serializeState() {
+    return {
+      users: Array.from(this.users.entries()),
+      students: Array.from(this.students.entries()),
+      restaurants: Array.from(this.restaurants.entries()),
+      menuItems: Array.from(this.menuItems.entries()),
+      packagingTypes: Array.from(this.packagingTypes.entries()),
+      packTransactions: Array.from(this.packTransactions.entries()),
+      riders: Array.from(this.riders.entries()),
+      orders: Array.from(this.orders.entries()),
+      orderItems: Array.from(this.orderItems.entries()),
+      platformSettings: Array.from(this.platformSettings.entries()),
+      supportTickets: Array.from(this.supportTickets.entries()),
+      auditLogs: Array.from(this.auditLogs.entries()),
+    };
+  }
+
+  private applyState(parsed: any) {
+    if (!parsed || typeof parsed !== 'object') return;
+    this.isHydrating = true;
+    try {
+      const restoreMap = <K, V>(map: PersistentMap<K, V>, entries?: [K, V][]) => {
+        if (Array.isArray(entries)) {
+          for (const [k, v] of entries) {
+            map.set(k, v);
+          }
+        }
+      };
+      restoreMap(this.users, parsed.users);
+      restoreMap(this.students, parsed.students);
+      restoreMap(this.restaurants, parsed.restaurants);
+      restoreMap(this.menuItems, parsed.menuItems);
+      restoreMap(this.packagingTypes, parsed.packagingTypes);
+      restoreMap(this.packTransactions, parsed.packTransactions);
+      restoreMap(this.riders, parsed.riders);
+      restoreMap(this.orders, parsed.orders);
+      restoreMap(this.orderItems, parsed.orderItems);
+      restoreMap(this.platformSettings, parsed.platformSettings);
+      restoreMap(this.supportTickets, parsed.supportTickets);
+      restoreMap(this.auditLogs, parsed.auditLogs);
+    } finally {
+      this.isHydrating = false;
+    }
+  }
+
+  private loadSnapshotFromDisk() {
+    try {
+      if (fs.existsSync(SNAPSHOT_FILE)) {
+        const raw = fs.readFileSync(SNAPSHOT_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        this.applyState(parsed);
+      }
+    } catch (err) {
+      console.warn('[DB] Failed to load local state snapshot:', err);
+    }
+  }
+
+  private saveSnapshotToDisk() {
+    try {
+      const dir = path.dirname(SNAPSHOT_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const payload = JSON.stringify(this.serializeState());
+      fs.writeFileSync(SNAPSHOT_FILE, payload, 'utf8');
+
+      if (pool) {
+        pool
+          .query(
+            `CREATE TABLE IF NOT EXISTS eubite_state_snapshots (
+              id TEXT PRIMARY KEY,
+              payload JSONB NOT NULL,
+              updated_at TIMESTAMPTZ DEFAULT NOW()
+            )`
+          )
+          .then(() =>
+            pool!.query(
+              `INSERT INTO eubite_state_snapshots (id, payload, updated_at)
+               VALUES ('primary', $1::jsonb, NOW())
+               ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+              [payload]
+            )
+          )
+          .catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[DB] Failed to save state snapshot:', err);
+    }
+  }
+
+  private async syncFromPostgres() {
+    if (!pool) return;
+    try {
+      await pool.query(
+        `CREATE TABLE IF NOT EXISTS eubite_state_snapshots (
+          id TEXT PRIMARY KEY,
+          payload JSONB NOT NULL,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )`
+      );
+      const res = await pool.query(`SELECT payload FROM eubite_state_snapshots WHERE id = 'primary' LIMIT 1`);
+      if (res.rows.length > 0 && res.rows[0].payload) {
+        this.applyState(res.rows[0].payload);
+      }
+    } catch {}
   }
 
   seed() {

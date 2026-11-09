@@ -52,6 +52,9 @@ export default function RiderDashboardPage() {
         throw new Error(data.error || 'Login failed');
       }
       setToken(data.token);
+      try {
+        localStorage.setItem('eubite_rider_session', JSON.stringify({ token: data.token }));
+      } catch {}
       loadRiderData(data.token);
     } catch (err: any) {
       setError(err.message);
@@ -59,6 +62,37 @@ export default function RiderDashboardPage() {
       setLoading(false);
     }
   };
+
+  const handleLogout = () => {
+    setToken(null);
+    setRider(null);
+    setActiveOrder(null);
+    setAvailableOrders([]);
+    try {
+      localStorage.removeItem('eubite_rider_session');
+    } catch {}
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('eubite_rider_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.token) {
+          setToken(parsed.token);
+          loadRiderData(parsed.token);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      loadRiderData(token);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   const loadRiderData = async (authToken: string) => {
     try {
@@ -265,7 +299,7 @@ export default function RiderDashboardPage() {
             Once approved, you will be able to turn on your availability and claim delivery drops.
           </p>
           <button
-            onClick={() => setToken(null)}
+            onClick={handleLogout}
             className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2.5 rounded-xl text-xs"
           >
             Sign Out
@@ -317,7 +351,7 @@ export default function RiderDashboardPage() {
           </button>
 
           <button
-            onClick={() => setToken(null)}
+            onClick={handleLogout}
             className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-full transition-colors"
             title="Sign Out"
           >

@@ -61,7 +61,10 @@ export class TelegramPollingService {
                 console.log(`📥 [Telegram Incoming from ${update.message.from?.first_name || chatId}]: "${text}"`);
 
                 try {
-                  await BotEngine.handleIncomingMessage(chatId, text, 'telegram');
+                  await BotEngine.handleIncomingMessage(chatId, text, 'telegram', {
+                    firstName: update.message.from?.first_name,
+                    username: update.message.from?.username,
+                  });
                 } catch (handleErr) {
                   console.error('[Error handling Telegram message]:', handleErr);
                 }
@@ -81,7 +84,10 @@ export class TelegramPollingService {
                     body: JSON.stringify({ callback_query_id: update.callback_query.id }),
                   }).catch(() => {});
 
-                  await BotEngine.handleIncomingMessage(chatId, data, 'telegram');
+                  await BotEngine.handleIncomingMessage(chatId, data, 'telegram', {
+                    firstName: update.callback_query.from?.first_name,
+                    username: update.callback_query.from?.username,
+                  });
                 } catch (handleErr) {
                   console.error('[Error handling Telegram callback]:', handleErr);
                 }

@@ -12,8 +12,9 @@ const CAMPUS_HOSTELS = [
   'Postgraduate Hall',
 ];
 
-// Debounce map for rapid clicks (key: identifier, value: timestamp)
-const recentActions = new Map<string, number>();
+// Debounce map for rapid clicks (key: identifier, value: { text, step, timestamp })
+const recentActions = new Map<string, { text: string; step: string; timestamp: number }>();
+const REPEATABLE_ACTIONS = new Set(['next_page', 'prev_page', 'plus_one']);
 
 export class BotEngine {
   /**
@@ -27,14 +28,21 @@ export class BotEngine {
   ): Promise<string> {
     const cleanText = text.trim();
     const session = sessionManager.getSession(identifier, channel);
+    const currentStep = session.step;
 
-    // Debounce rapid duplicate button taps (< 250ms)
+    // Debounce accidental double-taps (< 250ms) of the exact same command on the exact same conversation step
     const now = Date.now();
-    const lastAction = recentActions.get(identifier) || 0;
-    if (now - lastAction < 250 && cleanText === session.lastActivity?.toString()) {
+    const lastAction = recentActions.get(identifier);
+    if (
+      lastAction &&
+      now - lastAction.timestamp < 250 &&
+      cleanText === lastAction.text &&
+      currentStep === lastAction.step &&
+      !REPEATABLE_ACTIONS.has(cleanText.toLowerCase())
+    ) {
       return 'Debounced';
     }
-    recentActions.set(identifier, now);
+    recentActions.set(identifier, { text: cleanText, step: currentStep, timestamp: now });
 
     // Auto-populate name from Telegram if available and not yet set
     if (!session.studentName && metadata?.firstName) {

@@ -281,4 +281,75 @@ describe('EU Bite Central API Acceptance Tests', () => {
     assert.strictEqual(bridgeRes.status, 200);
     assert.strictEqual(bridgeData.data.fullName, 'Chioma Okoli');
   });
+
+  test('11. Public Order Tracking Endpoint (GET /api/orders/track/:query)', async () => {
+    const trackRes = await fetch(`${baseUrl}/api/orders/track/${encodeURIComponent(createdOrder.order_number)}`);
+    const trackData = (await trackRes.json()) as any;
+    assert.strictEqual(trackRes.status, 200);
+    assert.strictEqual(trackData.success, true);
+    assert.strictEqual(trackData.data.order_number, createdOrder.order_number);
+
+    const notFoundRes = await fetch(`${baseUrl}/api/orders/track/EUB-NONEXISTENT-9999`);
+    assert.strictEqual(notFoundRes.status, 404);
+  });
+
+  test('12. Multi-Vendor Checkout, Packaging Count Multiplier & Active Order Superseding', async () => {
+    const botToken = process.env.BOT_SERVICE_TOKEN || 'eu_bite_internal_bot_api_token_shared_secret';
+
+    // First unpaid order
+    const checkout1 = await fetch(`${baseUrl}/api/bot-bridge/checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bot-service-token': botToken,
+      },
+      body: JSON.stringify({
+        phone: '+2348099887766',
+        restaurant_id: '33333333-3333-3333-3333-333333333301',
+        items: [{ item_id: '44444444-4444-4444-4444-444444444401', quantity: 1 }],
+        packaging_type: 'reusable',
+        packaging_count: 1,
+        hostel: 'Queen Amina Hall',
+        room: 'B-10',
+      }),
+    });
+    const data1 = (await checkout1.json()) as any;
+    assert.strictEqual(checkout1.status, 200);
+    const firstOrderNum = data1.data.order_number;
+
+    // Second checkout mixing two vendors (r1 + r2) with 2 containers
+    const checkout2 = await fetch(`${baseUrl}/api/bot-bridge/checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bot-service-token': botToken,
+      },
+      body: JSON.stringify({
+        phone: '+2348099887766',
+        restaurant_id: '33333333-3333-3333-3333-333333333301',
+        items: [
+          { item_id: '44444444-4444-4444-4444-444444444401', quantity: 1 }, // Campus Bites & Grill (₦2,200)
+          { item_id: '44444444-4444-4444-4444-444444444405', quantity: 1 }, // Mama T's Bukka Delight (₦2,500)
+        ],
+        packaging_type: 'reusable',
+        packaging_count: 2,
+        hostel: 'Queen Amina Hall',
+        room: 'B-10',
+      }),
+    });
+    const data2 = (await checkout2.json()) as any;
+    assert.strictEqual(checkout2.status, 200);
+    assert.strictEqual(data2.data.packaging_fee_ngn, 500); // 2 packs * ₦250
+    assert.ok(data2.data.restaurant_name.includes('Campus Bites & Grill'));
+    assert.ok(data2.data.restaurant_name.includes('Mama T'));
+
+    // Active order lookup must return the latest second order, not the superseded first order
+    const activeRes = await fetch(`${baseUrl}/api/bot-bridge/orders/active/%2B2348099887766`, {
+      headers: { 'x-bot-service-token': botToken },
+    });
+    const activeData = (await activeRes.json()) as any;
+    assert.strictEqual(activeRes.status, 200);
+    assert.strictEqual(activeData.data.order_number, data2.data.order_number);
+    assert.notStrictEqual(activeData.data.order_number, firstOrderNum);
+  });
 });

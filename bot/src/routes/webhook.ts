@@ -45,8 +45,11 @@ router.post('/', async (req: any, res: any): Promise<void> => {
         }
 
         if (text) {
-          console.log(`[WHATSAPP INBOUND <- ${from}]: "${text}"`);
-          await BotEngine.handleIncomingMessage(from, text);
+          const senderName = value?.contacts?.[0]?.profile?.name;
+          console.log(`[WHATSAPP INBOUND <- ${from} (${senderName || 'Student'})]: "${text}"`);
+          await BotEngine.handleIncomingMessage(from, text, 'whatsapp', {
+            firstName: senderName,
+          });
         }
       }
 

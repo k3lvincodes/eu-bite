@@ -28,20 +28,13 @@ function TrackOrderContent() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/orders`);
+      const cleanQuery = searchNum.trim();
+      const res = await fetch(`${API_BASE}/api/orders/track/${encodeURIComponent(cleanQuery)}`);
       const data = await res.json();
-      if (!data.success) {
-        throw new Error('Could not fetch orders.');
+      if (!data.success || !data.data) {
+        throw new Error(data.error || `Order #${cleanQuery} not found. Please double check the order number.`);
       }
-      const matched = data.data?.find(
-        (o: any) =>
-          o.order_number?.toLowerCase() === searchNum.trim().toLowerCase() ||
-          o.id === searchNum.trim()
-      );
-      if (!matched) {
-        throw new Error(`Order #${searchNum} not found. Please double check the order number.`);
-      }
-      setOrder(matched);
+      setOrder(data.data);
     } catch (err: any) {
       setError(err.message);
       setOrder(null);

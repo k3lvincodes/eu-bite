@@ -158,13 +158,90 @@ export class AlatPayService {
   }
 
   /**
+   * Checks whether live ALATPay API credentials are configured
+   */
+  static isLiveMode(): boolean {
+    return Boolean(
+      ALATPAY_SECRET_KEY &&
+        !ALATPAY_SECRET_KEY.includes('test_') &&
+        !ALATPAY_SECRET_KEY.includes('xxxx') &&
+        ALATPAY_BUSINESS_ID &&
+        ALATPAY_BUSINESS_ID !== '00000000-0000-0000-0000-000000000000'
+    );
+  }
+
+  /**
+   * Queries ALATPay's live transaction status API when live credentials are configured.
+   * Enforces strict provider confirmation in production (or when ALATPAY_ENFORCE_LIVE_VERIFY=true),
+   * while allowing sandbox/dev simulated transfers when testing locally.
+   */
+  static async verifyTransactionWithProvider(
+    tx_ref: string,
+    transactionId?: string
+  ): Promise<{ confirmed: boolean; providerRef?: string; message?: string }> {
+    const enforceStrictLiveCheck =
+      process.env.NODE_ENV === 'production' || process.env.ALATPAY_ENFORCE_LIVE_VERIFY === 'true';
+
+    if (!this.isLiveMode()) {
+      return { confirmed: true, providerRef: transactionId || `ALAT-SANDBOX-${Date.now()}` };
+    }
+
+    try {
+      const lookupRef = encodeURIComponent(transactionId || tx_ref);
+      const response = await fetch(
+        `${ALATPAY_API_BASE}/bank-transfer/api/v1/bankTransfer/transactions/${lookupRef}`,
+        {
+          method: 'GET',
+          headers: {
+            'Ocp-Apim-Subscription-Key': ALATPAY_SECRET_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = (await response.json()) as any;
+        const txStatus = String(data?.data?.status || data?.status || '').toLowerCase();
+        if (['successful', 'completed', 'success', 'paid'].includes(txStatus)) {
+          return {
+            confirmed: true,
+            providerRef: data?.data?.transactionId || data?.data?.platformTransactionReference || transactionId,
+          };
+        }
+        if (enforceStrictLiveCheck) {
+          return {
+            confirmed: false,
+            message: 'We have not yet received confirmation of your bank transfer from ALATPay.',
+          };
+        }
+      } else if (enforceStrictLiveCheck) {
+        return {
+          confirmed: false,
+          message: 'Transfer has not yet been confirmed by ALATPay. Please wait a moment after transferring and try again.',
+        };
+      }
+    } catch (err: any) {
+      if (enforceStrictLiveCheck) {
+        return {
+          confirmed: false,
+          message: `Unable to reach ALATPay verification service: ${err.message || 'network error'}`,
+        };
+      }
+    }
+
+    // In local development / test sandbox, allow simulated transfer confirmation
+    return { confirmed: true, providerRef: transactionId || `ALAT-DEV-${Date.now()}` };
+  }
+
+  /**
    * Idempotent processing of payment verification.
    * Ensures an order is never credited twice.
    */
   static async processPaymentVerification(
     tx_ref: string,
     alatpay_ref?: string,
-    status: string = 'successful'
+    status: string = 'successful',
+    requireProviderCheck: boolean = false
   ): Promise<PaymentVerificationResult> {
     const normalizedStatus = ['successful', 'completed', 'success', 'paid'].includes(status.toLowerCase())
       ? 'successful'
@@ -208,6 +285,25 @@ export class AlatPayService {
         alatpay_ref: targetOrder.alatpay_transaction_id,
         message: 'Order already marked as paid.',
       };
+    }
+
+    // 3b. When triggered by client ("I Have Paid" / manual verify) in live mode, verify directly with ALATPay API first
+    if (requireProviderCheck && normalizedStatus === 'successful') {
+      const providerCheck = await this.verifyTransactionWithProvider(
+        targetOrder.alatpay_tx_ref || tx_ref,
+        alatpay_ref || targetOrder.alatpay_transaction_id
+      );
+      if (!providerCheck.confirmed) {
+        return {
+          verified: false,
+          orderId: targetOrder.id,
+          status: 'failed',
+          message: providerCheck.message || 'Transfer not yet confirmed by ALATPay.',
+        };
+      }
+      if (providerCheck.providerRef) {
+        alatpay_ref = providerCheck.providerRef;
+      }
     }
 
     // 4. Update order state atomically

@@ -228,22 +228,13 @@ export default function HomePage() {
 
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const res = await fetch(`${apiBase}/api/orders`);
+      const cleanQuery = trackingInput.trim();
+      const res = await fetch(`${apiBase}/api/orders/track/${encodeURIComponent(cleanQuery)}`);
       const data = await res.json();
-      if (!data.success) throw new Error('Could not fetch active campus orders.');
-
-      const cleanQuery = trackingInput.trim().toLowerCase();
-      const match = data.data?.find(
-        (o: any) =>
-          o.order_number?.toLowerCase() === cleanQuery ||
-          o.id?.toLowerCase() === cleanQuery ||
-          o.delivery_pin === cleanQuery
-      );
-
-      if (!match) {
-        throw new Error(`Order #${trackingInput.trim()} not found.`);
+      if (!data.success || !data.data) {
+        throw new Error(data.error || `Order #${cleanQuery} not found.`);
       }
-      setTrackedOrder(match);
+      setTrackedOrder(data.data);
     } catch (err: any) {
       setTrackingError(err.message || 'Unable to track order right now.');
       setTrackedOrder(null);

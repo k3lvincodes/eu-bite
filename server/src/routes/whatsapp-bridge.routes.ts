@@ -195,32 +195,50 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
       db.students.set(newStudentId, student);
     }
 
-    const restaurant = db.restaurants.get(restaurant_id);
-    if (!restaurant) {
-      res.status(404).json({ success: false, error: 'Restaurant not found' });
-      return;
-    }
+    let primaryRestaurant = restaurant_id ? db.restaurants.get(restaurant_id) : undefined;
+    const distinctRestaurantNames = new Set<string>();
 
     let food_subtotal_kobo = 0;
+    let totalItemContainers = 0;
     const orderItemsList: any[] = [];
 
     for (const reqItem of items) {
       const menuItem = db.menuItems.get(reqItem.item_id);
-      if (!menuItem || menuItem.restaurant_id !== restaurant.id || !menuItem.is_available) {
+      if (!menuItem || !menuItem.is_available) {
         res.status(400).json({ success: false, error: `Invalid or unavailable item: ${reqItem.item_id}` });
         return;
       }
 
-      const totalItemKobo = menuItem.price_kobo * reqItem.quantity;
+      const itemRest = db.restaurants.get(menuItem.restaurant_id);
+      if (!primaryRestaurant && itemRest) {
+        primaryRestaurant = itemRest;
+      }
+      if (itemRest) {
+        distinctRestaurantNames.add(itemRest.name);
+      }
+
+      const qty = Math.max(1, Number(reqItem.quantity) || 1);
+      totalItemContainers += qty;
+      const totalItemKobo = menuItem.price_kobo * qty;
       food_subtotal_kobo += totalItemKobo;
       orderItemsList.push({
         id: menuItem.id,
         name: menuItem.name,
         unit_price_kobo: menuItem.price_kobo,
-        quantity: reqItem.quantity,
+        quantity: qty,
         total_price_kobo: totalItemKobo,
       });
     }
+
+    if (!primaryRestaurant) {
+      res.status(404).json({ success: false, error: 'Restaurant not found' });
+      return;
+    }
+
+    const combinedRestaurantName =
+      distinctRestaurantNames.size > 0
+        ? Array.from(distinctRestaurantNames).join(' & ')
+        : primaryRestaurant.name;
 
     const minSetting = db.platformSettings.get('min_food_subtotal_kobo')?.value_json || 150000;
     if (food_subtotal_kobo < minSetting) {
@@ -231,36 +249,51 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
       return;
     }
 
+    const packagingQty = Math.max(1, Number(req.body.packaging_count) || totalItemContainers || 1);
     let packTypeId: string | undefined;
-    let packaging_fee_kobo = 25000;
+    let unitPackFeeKobo = 25000;
     for (const p of db.packagingTypes.values()) {
       if (p.code === (packaging_type === 'school' ? 'school' : 'reusable')) {
         packTypeId = p.id;
-        packaging_fee_kobo = p.fee_kobo;
+        unitPackFeeKobo = p.fee_kobo;
         break;
       }
     }
+    const packaging_fee_kobo = unitPackFeeKobo * packagingQty;
 
     const delivery_fee_kobo = db.platformSettings.get('hostel_delivery_fee_kobo')?.value_json || 32000;
     const service_fee_kobo = db.platformSettings.get('service_fee_kobo')?.value_json || 10000;
     const total_amount_kobo = food_subtotal_kobo + packaging_fee_kobo + delivery_fee_kobo + service_fee_kobo;
 
+    // Supersede any previous unpaid pending_payment orders for this student so /track and /pin always reflect the latest order
+    const now = new Date().toISOString();
+    for (const existingOrder of db.orders.values()) {
+      if (
+        existingOrder.student_id === student.id &&
+        existingOrder.status === 'pending_payment' &&
+        existingOrder.payment_status === 'unpaid'
+      ) {
+        existingOrder.status = 'cancelled';
+        existingOrder.updated_at = now;
+        db.orders.set(existingOrder.id, existingOrder);
+      }
+    }
+
     const orderId = crypto.randomUUID();
     const orderNumber = `EUB-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
     const deliveryPin = Math.floor(1000 + Math.random() * 9000).toString();
     const txRef = `EUB-WA-${orderNumber}-${Date.now()}`;
-    const now = new Date().toISOString();
 
     const order: Order = {
       id: orderId,
       order_number: orderNumber,
       student_id: student.id,
-      restaurant_id: restaurant.id,
+      restaurant_id: primaryRestaurant.id,
       status: 'pending_payment',
       food_subtotal_kobo,
       packaging_fee_kobo,
       packaging_type_id: packTypeId,
-      packaging_qty: 1,
+      packaging_qty: packagingQty,
       delivery_fee_kobo,
       service_fee_kobo,
       total_amount_kobo,
@@ -296,9 +329,10 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
       success: true,
       data: {
         order_number: orderNumber,
-        restaurant_name: restaurant.name,
+        restaurant_name: combinedRestaurantName,
         food_subtotal_ngn: food_subtotal_kobo / 100,
         packaging_fee_ngn: packaging_fee_kobo / 100,
+        packaging_qty: packagingQty,
         delivery_fee_ngn: delivery_fee_kobo / 100,
         service_fee_ngn: service_fee_kobo / 100,
         total_amount_ngn: total_amount_kobo / 100,
@@ -324,7 +358,7 @@ router.post('/verify-payment', async (req: any, res: any): Promise<void> => {
       return;
     }
 
-    const result = await AlatPayService.processPaymentVerification(reference, undefined, 'successful');
+    const result = await AlatPayService.processPaymentVerification(reference, undefined, 'successful', true);
     if (!result.verified && result.status !== 'successful') {
       res.status(400).json({ success: false, error: result.message });
       return;
@@ -384,19 +418,38 @@ router.get('/orders/active/:phoneNumber', (req: any, res: any): void => {
     return;
   }
 
-  let activeOrder: any = null;
+  const candidateOrders: Order[] = [];
   for (const o of db.orders.values()) {
-    if (o.student_id === student.id && o.status !== 'delivered' && o.status !== 'cancelled') {
-      const rest = db.restaurants.get(o.restaurant_id);
-      const items = Array.from(db.orderItems.values()).filter((i) => i.order_id === o.id);
-      activeOrder = {
-        ...o,
-        restaurant_name: rest?.name,
-        items,
-        total_ngn: o.total_amount_kobo / 100,
-      };
-      break;
+    if (
+      o.student_id === student.id &&
+      o.status !== 'delivered' &&
+      o.status !== 'cancelled' &&
+      o.status !== 'rejected'
+    ) {
+      candidateOrders.push(o);
     }
+  }
+
+  // Prioritize paid/in-progress orders over pending_payment, and newest over oldest
+  candidateOrders.sort((a, b) => {
+    const aPaid = a.payment_status === 'successful' ? 1 : 0;
+    const bPaid = b.payment_status === 'successful' ? 1 : 0;
+    if (aPaid !== bPaid) return bPaid - aPaid;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  const latestOrder = candidateOrders[0];
+  let activeOrder: any = null;
+  if (latestOrder) {
+    const rest = db.restaurants.get(latestOrder.restaurant_id);
+    const items = Array.from(db.orderItems.values()).filter((i) => i.order_id === latestOrder.id);
+    activeOrder = {
+      ...latestOrder,
+      restaurant_name: rest?.name,
+      items,
+      total_ngn: latestOrder.total_amount_kobo / 100,
+      total_amount_ngn: latestOrder.total_amount_kobo / 100,
+    };
   }
 
   if (!activeOrder) {

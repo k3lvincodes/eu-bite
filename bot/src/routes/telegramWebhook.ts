@@ -53,7 +53,9 @@ router.post('/', async (req: any, res: any): Promise<void> => {
 
     if (chatId && text) {
       console.log(`[TELEGRAM INBOUND <- ${chatId} (${senderName})]: "${text}"`);
-      await BotEngine.handleIncomingMessage(chatId.toString(), text, 'telegram');
+      await BotEngine.handleIncomingMessage(chatId.toString(), text, 'telegram', {
+        firstName: senderName,
+      });
     }
 
     // Acknowledge Telegram update with 200 OK
@@ -71,7 +73,9 @@ router.post('/simulate', async (req: any, res: any): Promise<void> => {
   const targetMsg = message || 'Hi';
 
   try {
-    const result = await BotEngine.handleIncomingMessage(targetId.toString(), targetMsg, 'telegram');
+    const result = await BotEngine.handleIncomingMessage(targetId.toString(), targetMsg, 'telegram', {
+      firstName: name,
+    });
     res.json({ success: true, channel: 'telegram', chatId: targetId, handled: result });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

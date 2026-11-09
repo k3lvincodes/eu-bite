@@ -65,6 +65,9 @@ export default function AdminDashboardPage() {
         throw new Error(data.error || 'Authentication failed');
       }
       setToken(data.token);
+      try {
+        localStorage.setItem('eubite_admin_session', JSON.stringify({ token: data.token }));
+      } catch {}
       loadAllAdminData(data.token);
     } catch (err: any) {
       setError(err.message);
@@ -72,6 +75,34 @@ export default function AdminDashboardPage() {
       setLoading(false);
     }
   };
+
+  const handleLogout = () => {
+    setToken(null);
+    try {
+      localStorage.removeItem('eubite_admin_session');
+    } catch {}
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('eubite_admin_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.token) {
+          setToken(parsed.token);
+          loadAllAdminData(parsed.token);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      loadAllAdminData(token);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   const loadAllAdminData = async (authToken: string) => {
     try {
@@ -300,7 +331,7 @@ export default function AdminDashboardPage() {
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setToken(null)}
+              onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-full transition-colors"
               title="Sign Out"
             >

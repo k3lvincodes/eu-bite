@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   UtensilsCrossed,
@@ -54,6 +54,12 @@ export default function VendorDashboardPage() {
       }
       setToken(data.token);
       setRestaurant(data.profile);
+      try {
+        localStorage.setItem(
+          'eubite_vendor_session',
+          JSON.stringify({ token: data.token, restaurantId: data.profile?.id, profile: data.profile })
+        );
+      } catch {}
       fetchRestaurantData(data.token, data.profile?.id);
     } catch (err: any) {
       setError(err.message);
@@ -61,6 +67,36 @@ export default function VendorDashboardPage() {
       setLoading(false);
     }
   };
+
+  const handleLogout = () => {
+    setToken(null);
+    setRestaurant(null);
+    try {
+      localStorage.removeItem('eubite_vendor_session');
+    } catch {}
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('eubite_vendor_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.token) {
+          setToken(parsed.token);
+          if (parsed.profile) setRestaurant(parsed.profile);
+          fetchRestaurantData(parsed.token, parsed.restaurantId || parsed.profile?.id);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      fetchRestaurantData(token, restaurant?.id);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [token, restaurant?.id]);
 
   const fetchRestaurantData = async (authToken: string, restId?: string) => {
     try {
@@ -158,6 +194,7 @@ export default function VendorDashboardPage() {
     const priceNgn = parseFloat(newItemPriceNgn);
     if (!newItemName || isNaN(priceNgn) || priceNgn <= 0) {
       alert('Please enter a valid item name and price.');
+      return;
     }
 
     try {
@@ -307,7 +344,7 @@ export default function VendorDashboardPage() {
             </button>
 
             <button
-              onClick={() => setToken(null)}
+              onClick={handleLogout}
               className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
               title="Sign Out"
             >

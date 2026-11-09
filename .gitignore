@@ -50,8 +50,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Agent / Tooling Caches
+# Agent / Tooling Caches & Local DB Snapshots
 .gemini/
+.data/
+**/.data/
 
 # Private Documentation & Local Development Notes
 docs/

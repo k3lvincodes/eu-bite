@@ -322,11 +322,6 @@ export default function HomePage() {
         <div className="grid lg:grid-cols-12 gap-12 items-center">
           {/* Left Copy */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#FFC529]/25 text-[#272D2F] text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-[#FE724C]" />
-              <span>15-Min Hostel Delivery • No App Needed</span>
-            </div>
-
             <h1 className="text-4xl sm:text-6xl font-black text-[#272D2F] tracking-tight leading-[1.08]">
               Hot campus meals, straight to your <span className="text-[#FE724C]">hostel door.</span>
             </h1>

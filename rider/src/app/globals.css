@@ -1,19 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-pinterest-sans: 'pinterest-sans';
+}
+
+html {
+  font-family: 'pinterest-sans' !important;
 }
 
 * {
-  font-family: 'Inter', sans-serif !important;
+  font-family: 'pinterest-sans' !important;
 }
 
 body {
-  font-family: 'Inter', sans-serif !important;
+  font-family: 'pinterest-sans' !important;
   color: #0f172a;
   background-color: #f1f5f9;
 }

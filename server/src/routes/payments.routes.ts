@@ -2,7 +2,7 @@ import { createRouter as Router } from '../utils/expressCompat.ts';
 import { db } from '../db/index.ts';
 import { authenticate } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { FlutterwaveService } from '../services/flutterwave.ts';
+import { AlatPayService } from '../services/alatpay.ts';
 import { logAudit } from '../utils/logger.ts';
 
 const router = Router();
@@ -29,14 +29,14 @@ router.post('/initialize/:orderId', authenticate, async (req: any, res: any): Pr
   const customerEmail = user?.email || 'student@eubite.com';
   const customerPhone = user?.phone || student?.phone_number || '+2348000000000';
 
-  const { paymentUrl, tx_ref } = await FlutterwaveService.createPaymentLink(
+  const { paymentUrl, tx_ref, virtualAccount } = await AlatPayService.createPaymentLink(
     order,
     customerName,
     customerEmail,
     customerPhone
   );
 
-  order.flutterwave_tx_ref = tx_ref;
+  order.alatpay_tx_ref = tx_ref;
   order.updated_at = new Date().toISOString();
   db.orders.set(order.id, order);
 
@@ -51,35 +51,50 @@ router.post('/initialize/:orderId', authenticate, async (req: any, res: any): Pr
       total_amount_ngn: order.total_amount_kobo / 100,
       tx_ref,
       paymentUrl,
+      ...(virtualAccount ? { virtualAccount } : {}),
     },
   });
 });
 
 // POST /api/payments/webhook
 router.post('/webhook', async (req: any, res: any): Promise<void> => {
-  const signature = req.headers?.['verif-hash'];
+  const signature =
+    req.headers?.['x-alatpay-signature'] ||
+    req.headers?.['ocp-apim-subscription-key'] ||
+    req.headers?.['verif-hash'];
 
-  const isValid = FlutterwaveService.verifyWebhookSignature(signature);
+  const isValid = AlatPayService.verifyWebhookSignature(signature);
   if (!isValid && process.env.NODE_ENV === 'production') {
-    console.warn('[WEBHOOK] Invalid webhook signature from IP:', req.ip);
+    console.warn('[WEBHOOK] Invalid ALATPay webhook signature from IP:', req.ip);
     res.status(401).json({ success: false, error: 'Unauthorized webhook signature' });
     return;
   }
 
   const payload = req.body;
-  const tx_ref = payload?.data?.tx_ref || payload?.tx_ref;
-  const flw_ref = payload?.data?.flw_ref || payload?.flw_ref;
+  const tx_ref =
+    payload?.data?.transactionReference ||
+    payload?.data?.orderId ||
+    payload?.data?.tx_ref ||
+    payload?.transactionReference ||
+    payload?.orderId ||
+    payload?.tx_ref;
+  const alatpay_ref =
+    payload?.data?.platformTransactionReference ||
+    payload?.data?.transactionId ||
+    payload?.data?.alatpay_ref ||
+    payload?.platformTransactionReference ||
+    payload?.alatpay_ref;
   const status = (payload?.data?.status || payload?.status || '').toLowerCase();
 
   if (!tx_ref) {
-    res.status(400).json({ success: false, error: 'Missing transaction reference (tx_ref)' });
+    res.status(400).json({ success: false, error: 'Missing transaction reference (tx_ref / transactionReference)' });
     return;
   }
 
-  const result = await FlutterwaveService.processPaymentVerification(
+  const result = await AlatPayService.processPaymentVerification(
     tx_ref,
-    flw_ref,
-    status === 'successful' ? 'successful' : 'failed'
+    alatpay_ref,
+    status || 'successful'
   );
 
   res.status(200).json({ success: true, message: result.message });
@@ -87,16 +102,17 @@ router.post('/webhook', async (req: any, res: any): Promise<void> => {
 
 // POST /api/payments/verify
 router.post('/verify', async (req: any, res: any): Promise<void> => {
-  const { tx_ref, status } = req.body;
+  const { tx_ref, transactionReference, alatpay_ref, status } = req.body;
+  const resolvedRef = tx_ref || transactionReference;
 
-  if (!tx_ref) {
+  if (!resolvedRef) {
     res.status(400).json({ success: false, error: 'Transaction reference is required.' });
     return;
   }
 
-  const result = await FlutterwaveService.processPaymentVerification(
-    tx_ref,
-    undefined,
+  const result = await AlatPayService.processPaymentVerification(
+    resolvedRef,
+    alatpay_ref,
     status === 'successful' || !status ? 'successful' : status
   );
 
@@ -107,7 +123,7 @@ router.post('/verify', async (req: any, res: any): Promise<void> => {
 
   let order: any = null;
   for (const o of db.orders.values()) {
-    if (o.flutterwave_tx_ref === tx_ref) {
+    if (o.alatpay_tx_ref === resolvedRef || o.order_number === resolvedRef) {
       const rest = db.restaurants.get(o.restaurant_id);
       order = {
         ...o,

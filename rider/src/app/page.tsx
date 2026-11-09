@@ -351,7 +351,7 @@ export default function RiderDashboardPage() {
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 uppercase tracking-wide">
                 Active Delivery
               </span>
-              <span className="font-mono text-xs font-bold text-slate-300">#{activeOrder.order_number}</span>
+              <span className="font-sans text-xs font-bold text-slate-300">#{activeOrder.order_number}</span>
             </div>
 
             {/* Restaurant Pickup Details */}
@@ -438,7 +438,7 @@ export default function RiderDashboardPage() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-white">{order.restaurant_name}</span>
-                  <span className="text-xs font-black text-emerald-400 font-mono">+₦250</span>
+                  <span className="text-xs font-black text-emerald-400 font-sans">+₦250</span>
                 </div>
 
                 <div className="text-xs text-slate-400 flex items-center gap-1.5">
@@ -492,7 +492,7 @@ export default function RiderDashboardPage() {
                 placeholder="4-digit PIN"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
-                className="w-full text-center text-2xl font-mono tracking-widest font-black py-3 rounded-xl bg-slate-950 border border-slate-700 text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full text-center text-2xl font-sans tracking-widest font-black py-3 rounded-xl bg-slate-950 border border-slate-700 text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 autoFocus
                 required
               />

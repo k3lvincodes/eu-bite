@@ -7,7 +7,7 @@
 [![Tests](https://img.shields.io/badge/Tests-34%20Passed-brightgreen)](https://github.com/k3lvincodes/eu-bite)
 [![License](https://img.shields.io/badge/License-Proprietary-blue.svg)](LICENSE)
 
-**EU Bite** is a production-grade, WhatsApp- and Telegram-first campus food ordering and delivery ecosystem built specifically for university campuses. It brings cafeteria meals directly to student hostel rooms, featuring atomic delivery dispatch, secure 4-digit delivery PIN handoff verification, sustainable circular food packaging, and instant Flutterwave payments.
+**EU Bite** is a production-grade, WhatsApp- and Telegram-first campus food ordering and delivery ecosystem built specifically for university campuses. It brings cafeteria meals directly to student hostel rooms, featuring atomic delivery dispatch, secure 4-digit delivery PIN handoff verification, sustainable circular food packaging, and instant ALATPay payments.
 
 ---
 
@@ -40,7 +40,7 @@ The system strictly adheres to a centralized single-source-of-truth backend arch
                                   ┌───────────────────┴───────────────────┐
                                   ▼                                       ▼
                      ┌─────────────────────────┐             ┌─────────────────────────┐
-                     │   Supabase PostgreSQL   │             │  Flutterwave Gateway    │
+                     │   Supabase PostgreSQL   │             │    ALATPay Gateway      │
                      │   Database with RLS     │             │  Payments & Webhooks    │
                      └─────────────────────────┘             └─────────────────────────┘
 ```
@@ -55,10 +55,10 @@ The repository contains six isolated application folders, each with its own pack
 |---|---|---|---|
 | [`/server`](file:///server) | Central Node.js, Express, TypeScript API and core business logic | Node.js, Express, TypeScript, Supabase PostgreSQL, Zod | `4000` |
 | [`/bot`](file:///bot) | Omnichannel WhatsApp Cloud API & Telegram bot state machine | Node.js, Express, TypeScript, Meta Graph API, Telegram API | `4001` |
-| [`/landing-page`](file:///landing-page) | Public campus landing page, menu viewer, and live tracking | Next.js 14, React 18, Tailwind CSS, Inter Font | `3000` |
-| [`/vendor`](file:///vendor) | Dedicated kitchen operations portal, live order queue & stock | Next.js 14, React 18, Tailwind CSS, Inter Font | `3003` |
-| [`/rider`](file:///rider) | Mobile-first rider dispatch portal, atomic claiming & PIN verification | Next.js 14, React 18, Tailwind CSS, Inter Font | `3001` |
-| [`/admin`](file:///admin) | Administrative control center, fleet approvals, packaging ledger | Next.js 14, React 18, Tailwind CSS, Inter Font | `3002` |
+| [`/landing-page`](file:///landing-page) | Public campus landing page, menu viewer, and live tracking | Next.js 14, React 18, Tailwind CSS, pinterest-sans | `3000` |
+| [`/vendor`](file:///vendor) | Dedicated kitchen operations portal, live order queue & stock | Next.js 14, React 18, Tailwind CSS, pinterest-sans | `3003` |
+| [`/rider`](file:///rider) | Mobile-first rider dispatch portal, atomic claiming & PIN verification | Next.js 14, React 18, Tailwind CSS, pinterest-sans | `3001` |
+| [`/admin`](file:///admin) | Administrative control center, fleet approvals, packaging ledger | Next.js 14, React 18, Tailwind CSS, pinterest-sans | `3002` |
 
 ---
 
@@ -72,7 +72,7 @@ This repository includes a native [render.yaml](render.yaml) Blueprint for 1-cli
 3. Select your repository. Render will automatically detect `render.yaml` and provision:
    - **`eu-bite-server`**: Central API Web Service (`server/`)
    - **`eu-bite-bot`**: Omnichannel Bot Web Service (`bot/`)
-4. Populate your secret environment variables in the Render Dashboard (`DATABASE_URL`, `FLUTTERWAVE_SECRET_KEY`, `WHATSAPP_ACCESS_TOKEN`, `TELEGRAM_BOT_TOKEN`).
+4. Populate your secret environment variables in the Render Dashboard (`DATABASE_URL`, `ALATPAY_SECRET_KEY`, `ALATPAY_BUSINESS_ID`, `WHATSAPP_ACCESS_TOKEN`, `TELEGRAM_BOT_TOKEN`).
 
 ---
 
@@ -115,10 +115,10 @@ Both the Central Server and the Bot service expose an active, lightweight health
 ## 5. Security & Business Logic Invariants
 
 1. **Single Source of Truth**: Clients never calculate prices, totals, or modify order statuses directly. The central server calculates all subtotal and grand total figures in integer kobo.
-2. **Payment Verification Gate**: Vendors only receive orders marked `paid`. An order cannot transition to `vendor_accepted` or `preparing` until its payment status is verified via Flutterwave.
+2. **Payment Verification Gate**: Vendors only receive orders marked `paid`. An order cannot transition to `vendor_accepted` or `preparing` until its payment status is verified via ALATPay.
 3. **Atomic Rider Claiming**: Concurrency-safe lock ensures exactly one approved online rider can claim an order marked `ready_for_pickup`. Duplicate claims are rejected with HTTP 409.
 4. **4-Digit Delivery PIN Verification**: Deliveries cannot be marked `delivered` without the server validating the 4-digit numeric PIN handed from the student to the rider. The system enforces a maximum of 5 PIN attempts before security lockout.
-5. **Payment Webhook Idempotency**: Duplicate Flutterwave webhook triggers are tracked and safely replayed without duplicate status changes, inventory deductions, or double charging.
+5. **Payment Webhook Idempotency**: Duplicate ALATPay webhook triggers are tracked and safely replayed without duplicate status changes, inventory deductions, or double charging.
 6. **Circular Food Packaging Ledger**: Packaging inventory is allocated, tracked, and decremented upon payment, with physical transactions recorded for issuance, returns, damages, and restocks.
 7. **Protected Local Docs**: Private infrastructure notes, credentials, and sensitive deployment guides are kept in the `docs/` directory (ignored by `.gitignore`) to protect production specifics on public repositories.
 

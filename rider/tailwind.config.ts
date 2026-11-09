@@ -9,7 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', 'Inter', 'sans-serif'],
+        sans: ['pinterest-sans'],
+        mono: ['pinterest-sans'],
       },
       colors: {
         brand: {

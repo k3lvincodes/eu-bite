@@ -142,8 +142,8 @@ export interface Order {
   delivery_notes?: string;
   delivery_pin: string;
   pin_attempts: number;
-  flutterwave_tx_ref?: string;
-  flutterwave_flw_ref?: string;
+  alatpay_tx_ref?: string;
+  alatpay_transaction_id?: string;
   payment_status: PaymentStatus;
   paid_at?: string;
   prepared_at?: string;

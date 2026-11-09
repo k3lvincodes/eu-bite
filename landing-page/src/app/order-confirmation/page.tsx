@@ -30,7 +30,7 @@ function ConfirmationContent() {
             <ShieldCheck className="w-4 h-4" />
             <span>Delivery Verification PIN</span>
           </div>
-          <p className="text-3xl font-black tracking-widest font-mono text-emerald-400">
+          <p className="text-3xl font-black tracking-widest font-sans text-emerald-400">
             Available in Tracker
           </p>
           <p className="text-[11px] text-slate-400 leading-tight">

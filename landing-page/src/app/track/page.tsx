@@ -150,7 +150,7 @@ function TrackOrderContent() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-emerald-800 uppercase">Your Delivery PIN</p>
-                  <p className="text-base font-black text-emerald-950 font-mono tracking-wider">{order.delivery_pin}</p>
+                  <p className="text-base font-black text-emerald-950 font-sans tracking-wider">{order.delivery_pin}</p>
                 </div>
               </div>
             </div>

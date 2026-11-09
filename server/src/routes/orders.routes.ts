@@ -164,7 +164,7 @@ router.post('/', authenticate, async (req: any, res: any): Promise<void> => {
       delivery_notes: data.delivery_notes,
       delivery_pin: deliveryPin,
       pin_attempts: 0,
-      flutterwave_tx_ref: txRef,
+      alatpay_tx_ref: txRef,
       payment_status: 'unpaid',
       created_at: now,
       updated_at: now,

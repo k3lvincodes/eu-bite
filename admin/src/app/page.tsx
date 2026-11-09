@@ -397,7 +397,7 @@ export default function AdminDashboardPage() {
                         <p className="text-xs font-bold text-slate-900">{p.name}</p>
                         <p className="text-[11px] text-slate-500">Fee: ₦{(p.fee_kobo / 100).toLocaleString()}</p>
                       </div>
-                      <span className="font-mono text-sm font-black text-emerald-600">{p.stock_count} in stock</span>
+                      <span className="font-sans text-sm font-black text-emerald-600">{p.stock_count} in stock</span>
                     </div>
                   ))}
                 </div>
@@ -447,7 +447,7 @@ export default function AdminDashboardPage() {
                 <tbody className="divide-y divide-slate-100">
                   {orders.map((o) => (
                     <tr key={o.id} className="hover:bg-slate-50">
-                      <td className="py-3 font-mono font-bold text-slate-900">{o.order_number}</td>
+                      <td className="py-3 font-sans font-bold text-slate-900">{o.order_number}</td>
                       <td className="py-3 text-slate-800">{o.restaurant_name}</td>
                       <td className="py-3 text-slate-600">{o.hostel}, {o.room}</td>
                       <td className="py-3">
@@ -455,7 +455,7 @@ export default function AdminDashboardPage() {
                           {o.status.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="py-3 font-mono font-black text-emerald-600">{o.delivery_pin}</td>
+                      <td className="py-3 font-sans font-black text-emerald-600">{o.delivery_pin}</td>
                       <td className="py-3 font-bold text-slate-900">₦{(o.total_amount_kobo / 100).toLocaleString()}</td>
                       <td className="py-3">
                         <span
@@ -589,7 +589,7 @@ export default function AdminDashboardPage() {
                     {packTransactions.map((tx) => (
                       <tr key={tx.id}>
                         <td className="py-2.5 font-bold uppercase text-slate-800">{tx.transaction_type}</td>
-                        <td className="py-2.5 font-mono">{tx.quantity} units</td>
+                        <td className="py-2.5 font-sans">{tx.quantity} units</td>
                         <td className="py-2.5 text-slate-600">{tx.notes || '—'}</td>
                         <td className="py-2.5 text-slate-400">{new Date(tx.created_at).toLocaleTimeString()}</td>
                       </tr>
@@ -618,7 +618,7 @@ export default function AdminDashboardPage() {
                       type="number"
                       defaultValue={s.value_json}
                       id={`input-${s.key}`}
-                      className="text-xs px-3 py-2 rounded-lg border border-slate-300 w-full font-mono"
+                      className="text-xs px-3 py-2 rounded-lg border border-slate-300 w-full font-sans"
                     />
                     <button
                       onClick={() => {
@@ -646,7 +646,7 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
+              <table className="w-full text-left text-xs font-sans">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-400">
                     <th className="pb-2">Action</th>

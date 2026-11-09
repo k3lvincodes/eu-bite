@@ -159,7 +159,7 @@ describe('EU Bite Central API Acceptance Tests', () => {
     const res1 = await fetch(`${baseUrl}/api/payments/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_ref: createdOrder.flutterwave_tx_ref, status: 'successful' }),
+      body: JSON.stringify({ tx_ref: createdOrder.alatpay_tx_ref, status: 'successful' }),
     });
     const data1 = (await res1.json()) as any;
     assert.strictEqual(res1.status, 200);
@@ -174,7 +174,7 @@ describe('EU Bite Central API Acceptance Tests', () => {
     const res2 = await fetch(`${baseUrl}/api/payments/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_ref: createdOrder.flutterwave_tx_ref, status: 'successful' }),
+      body: JSON.stringify({ tx_ref: createdOrder.alatpay_tx_ref, status: 'successful' }),
     });
     const data2 = (await res2.json()) as any;
     assert.strictEqual(res2.status, 200);

@@ -56,7 +56,7 @@ export interface PendingOrder {
 
 export interface UserSession {
   phone: string; // Identifier: phone or Telegram Chat ID
-  realPhone?: string; // Verified Nigerian phone number for orders/Flutterwave
+  realPhone?: string; // Verified Nigerian phone number for orders/ALATPay
   channel: 'whatsapp' | 'telegram';
   step: ConversationStep;
   isRegistered?: boolean;

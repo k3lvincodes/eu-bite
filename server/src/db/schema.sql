@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS orders (
     delivery_notes TEXT,
     delivery_pin VARCHAR(4) NOT NULL,
     pin_attempts INT DEFAULT 0,
-    flutterwave_tx_ref VARCHAR(100) UNIQUE,
-    flutterwave_flw_ref VARCHAR(100),
+    alatpay_tx_ref VARCHAR(100) UNIQUE,
+    alatpay_transaction_id VARCHAR(100),
     payment_status VARCHAR(20) DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'successful', 'failed', 'refunded')),
     paid_at TIMESTAMPTZ,
     prepared_at TIMESTAMPTZ,
@@ -223,7 +223,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_student_id ON orders(student_id);
 CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_orders_rider_id ON orders(rider_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_tx_ref ON orders(flutterwave_tx_ref);
+CREATE INDEX IF NOT EXISTS idx_orders_tx_ref ON orders(alatpay_tx_ref);
 CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant ON menu_items(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_pack_trans_type ON pack_inventory_transactions(transaction_type);
 

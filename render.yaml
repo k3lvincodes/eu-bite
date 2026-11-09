@@ -23,9 +23,13 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false # Set in Render Dashboard: Supabase pooled connection string
-      - key: FLUTTERWAVE_SECRET_KEY
+      - key: ALATPAY_PUBLIC_KEY
         sync: false
-      - key: FLUTTERWAVE_SECRET_HASH
+      - key: ALATPAY_SECRET_KEY
+        sync: false
+      - key: ALATPAY_BUSINESS_ID
+        sync: false
+      - key: ALATPAY_WEBHOOK_SECRET
         sync: false
       - key: CORS_ORIGIN
         value: "*"

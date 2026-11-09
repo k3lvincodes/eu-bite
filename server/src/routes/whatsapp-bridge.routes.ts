@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { hashPassword } from '../utils/hash.ts';
 import { db } from '../db/index.ts';
 import { verifyBotAuth } from '../middleware/auth.ts';
-import { FlutterwaveService } from '../services/flutterwave.ts';
+import { AlatPayService } from '../services/alatpay.ts';
 import { logAudit } from '../utils/logger.ts';
 import type { User, Student, Order, OrderItem } from '../types/index.ts';
 
@@ -268,7 +268,7 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
       room: room || student.default_room,
       delivery_pin: deliveryPin,
       pin_attempts: 0,
-      flutterwave_tx_ref: txRef,
+      alatpay_tx_ref: txRef,
       payment_status: 'unpaid',
       created_at: now,
       updated_at: now,
@@ -290,7 +290,7 @@ router.post('/checkout', async (req: any, res: any): Promise<void> => {
       db.orderItems.set(oItemId, itemRecord);
     }
 
-    const { paymentUrl } = await FlutterwaveService.createPaymentLink(order, user.full_name, user.email, user.phone);
+    const { paymentUrl } = await AlatPayService.createPaymentLink(order, user.full_name, user.email, user.phone);
 
     res.json({
       success: true,

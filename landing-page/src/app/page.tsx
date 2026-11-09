@@ -214,15 +214,15 @@ const faqItems = [
   },
   {
     question: 'How does the 4-digit Security PIN handoff work?',
-    answer: 'When your payment is verified on Flutterwave, you receive a secret 4-digit delivery PIN in your WhatsApp chat. When the dispatch rider arrives at your hostel door or porter’s lodge, you share this PIN. The rider enters it on their terminal to unlock and complete the handoff. This eliminates wrong drops and disputes.',
+    answer: 'When your payment is verified on ALATPay, you receive a secret 4-digit delivery PIN in your WhatsApp chat. When the dispatch rider arrives at your hostel door or porter’s lodge, you share this PIN. The rider enters it on their terminal to unlock and complete the handoff. This eliminates wrong drops and disputes.',
   },
   {
     question: 'What is the circular Reusable Eco-Pack (₦250) vs Cafeteria Pack (₦500)?',
     answer: 'The Reusable Eco-Pack is our flagship initiative to eradicate single-use packaging from campus grounds. It’s an insulated, microwave-safe container that you can drop off at designated hostel bins when done. Dropping it off credits your student account with eco-points for discounted future deliveries.',
   },
   {
-    question: 'What payment methods are supported on Flutterwave?',
-    answer: 'We accept debit cards (Verve, Mastercard, Visa), instant bank transfers (with dedicated virtual accounts), and USSD. Payments are verified automatically and trigger kitchen order printing in under 2 seconds.',
+    question: 'What payment methods are supported on ALATPay?',
+    answer: 'We accept debit cards (Verve, Mastercard, Visa), instant bank transfers (with dedicated Wema Bank virtual accounts), and USSD via ALATPay. Payments are verified automatically and trigger kitchen order printing in under 2 seconds.',
   },
   {
     question: 'What happens if my hostel gate is locked after hours?',
@@ -619,7 +619,7 @@ export default function HomePage() {
                         <div className="bg-white rounded-2xl rounded-tl-sm p-2.5 shadow-xs max-w-[90%] text-slate-800 space-y-1">
                           <p className="font-bold text-emerald-800 text-[11px]">Welcome to EU Bite!</p>
                           <p className="text-[10px] text-slate-600">Which campus cafeteria would you like to order from?</p>
-                          <div className="mt-1 pt-1 border-t border-slate-100 text-[10px] font-mono space-y-0.5 text-slate-700">
+                          <div className="mt-1 pt-1 border-t border-slate-100 text-[10px] font-sans space-y-0.5 text-slate-700">
                             <p>1. Campus Bites & Grill</p>
                             <p>2. Mama T’s Bukka Delight</p>
                             <p>3. Student Chops & Grills</p>
@@ -751,7 +751,7 @@ export default function HomePage() {
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                       <span className="font-bold text-white">Live Courier Radar</span>
                     </div>
-                    <span className="text-emerald-400 font-mono text-[11px]">ACTIVE #EB-8492</span>
+                    <span className="text-emerald-400 font-sans text-[11px]">ACTIVE #EB-8492</span>
                   </div>
 
                   <div className="bg-black/60 rounded-2xl p-3 border border-slate-800 flex items-center justify-between">
@@ -767,7 +767,7 @@ export default function HomePage() {
 
                   <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-3 text-center">
                     <p className="text-[10px] text-emerald-300 font-medium">Handoff Security PIN</p>
-                    <p className="text-2xl font-mono font-black text-emerald-400 tracking-widest mt-0.5">8 • 4 • 9 • 2</p>
+                    <p className="text-2xl font-sans font-black text-emerald-400 tracking-widest mt-0.5">8 • 4 • 9 • 2</p>
                     <p className="text-[9px] text-slate-400 mt-1">Unlock with courier upon physical delivery</p>
                   </div>
                 </div>
@@ -1214,7 +1214,7 @@ export default function HomePage() {
               </div>
               <h4 className="font-bold text-slate-900 text-base">Select Pack & Pay</h4>
               <p className="text-slate-600 text-xs mt-2 leading-relaxed">
-                Choose Reusable (₦250) or Cafeteria Pack (₦500). Pay instantly via Flutterwave card or bank transfer.
+                Choose Reusable (₦250) or Cafeteria Pack (₦500). Pay instantly via ALATPay card or bank transfer.
               </p>
             </div>
 
@@ -1477,7 +1477,7 @@ export default function HomePage() {
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-mono font-bold text-slate-900 text-sm">#{trackedOrder.order_number}</span>
+                    <span className="font-sans font-bold text-slate-900 text-sm">#{trackedOrder.order_number}</span>
                     <p className="text-[11px] text-slate-500">
                       Drop-off: <strong>{trackedOrder.hostel || 'Hostel Block C'}</strong> (Room {trackedOrder.room || '214'})
                     </p>
@@ -1494,7 +1494,7 @@ export default function HomePage() {
                   </p>
                   <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                     <span>Total Paid: <strong>₦{((trackedOrder.total_amount_kobo || 277000) / 100).toLocaleString()}</strong></span>
-                    <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    <span className="font-sans font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                       PIN: {trackedOrder.delivery_pin || '****'}
                     </span>
                   </div>
